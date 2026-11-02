@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{% if creating %}New homepage hero{% else %}Edit homepage hero{% endif %} — Content desk{% endblock %}
+{% block content %}
+<section class="cms-form-shell"><a class="back-link" href="{% url 'cms-dashboard' %}">← Content desk</a><div class="form-page-heading"><span class="eyebrow">Homepage first impression</span><h1>{% if creating %}Set the scene.{% else %}Refresh the welcome.{% endif %}</h1><p>The public homepage uses the first published slide by display order.</p></div>
+  <form method="post" class="cms-form">{% csrf_token %}{% for field in form %}<div class="form-field {% if field.name == 'subtitle' %}field-full{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}<div class="form-actions"><button class="button button-outline" type="submit" name="action" value="draft">Save draft</button>{% if can_publish %}<button class="button button-dark" type="submit" name="action" value="publish">Publish slide <span aria-hidden="true">↗</span></button>{% endif %}</div></form>
+</section>
+{% endblock %}

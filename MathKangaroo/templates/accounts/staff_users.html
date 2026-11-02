@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}User management — Math Kangaroo Bangladesh{% endblock %}
+{% block content %}
+<section class="cms-shell">
+  <div class="dashboard-heading">
+    <div>
+      <a class="back-link" href="{% url 'accounts:dashboard' %}">← Your dashboard</a>
+      <span class="eyebrow">Staff workspace</span>
+      <h1>People & participation.</h1>
+      <p>Find accounts by name, username, email, phone or institute, then review and update user details.</p>
+    </div>
+    <span class="dashboard-avatar cms-avatar" aria-hidden="true">◎</span>
+  </div>
+
+  <div class="user-stat-grid" aria-label="User registration statistics">
+    <article class="user-stat-card"><span>All accounts</span><strong>{{ total_users }}</strong></article>
+    <article class="user-stat-card"><span>Student accounts</span><strong>{{ student_users }}</strong></article>
+    <article class="user-stat-card"><span>Guardian accounts</span><strong>{{ guardian_users }}</strong></article>
+    <article class="user-stat-card"><span>Staff accounts</span><strong>{{ staff_users_count }}</strong></article>
+    <article class="user-stat-card"><span>Joined in last 30 days</span><strong>{{ recent_users }}</strong></article>
+    <article class="user-stat-card"><span>Competition registrations</span><strong>{{ competition_registrations }}</strong><small>{% if current_season %}{{ current_season.year }} season: {{ current_season_registrations }}{% else %}No current season{% endif %}</small></article>
+  </div>
+
+  <form method="get" class="filter-bar user-search-bar" role="search">
+    <label class="search-field"><span class="sr-only">Search users</span><span aria-hidden="true">⌕</span><input type="search" name="q" value="{{ search }}" placeholder="Name, username, email, phone or institute"></label>
+    <button class="button button-dark button-small" type="submit">Search users</button>
+    {% if search %}<a class="button button-outline button-small" href="{% url 'accounts:staff-users' %}">Clear</a>{% endif %}
+  </form>
+
+  <section class="cms-section user-management-section">
+    <div class="cms-section-heading"><div><span class="eyebrow">Account directory</span><h2>{% if search %}Search results{% else %}All users{% endif %}</h2></div><span class="user-result-count">{{ page_obj.paginator.count }} found</span></div>
+    <div class="cms-table-wrap">
+      <table class="cms-table user-table">
+        <thead><tr><th>User</th><th>Contact</th><th>Institute</th><th>Type & status</th><th>Registrations</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for account in page_obj %}
+            <tr>
+              <td><strong>{{ account.get_full_name|default:account.username }}</strong><small>@{{ account.username }}</small></td>
+              <td>{{ account.email|default:"No email" }}{% if account.student_profile.phone %}<small>{{ account.student_profile.phone }}</small>{% endif %}</td>
+              <td>{% with latest_registration=account.competition_registrations.all|first %}{% if latest_registration %}<strong>{{ latest_registration.school_name }}</strong><small>{{ latest_registration.season.year }} · Grade {{ latest_registration.grade }}</small>{% else %}—{% endif %}{% endwith %}</td>
+              <td><span class="status-pill">{% if account.is_superuser %}Superuser{% elif account.is_staff %}Staff{% else %}{{ account.get_role_display }}{% endif %}</span><small class="{% if account.is_active %}account-active{% else %}account-inactive{% endif %}">{% if account.is_active %}Active{% else %}Inactive{% endif %}</small></td>
+              <td>{{ account.registration_count }}</td>
+              <td class="table-actions user-actions">
+                {% if account.is_superuser and not request.user.is_superuser %}<span>Protected</span>{% else %}
+                  <a href="{% url 'accounts:staff-user-edit' account.pk %}">Edit</a>
+                  {% if account.is_active and account.pk != request.user.pk and not account.is_superuser %}
+                    <form method="post" action="{% url 'accounts:staff-user-deactivate' account.pk %}" data-confirm="Deactivate this account? Access will be removed, but competition and audit history will be kept.">{% csrf_token %}<button type="submit">Deactivate</button></form>
+                  {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="table-empty">{% if search %}No users match that search.{% else %}No user accounts have been created yet.{% endif %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj.has_other_pages %}
+      <nav class="pagination" aria-label="User management pages">
+        {% if page_obj.has_previous %}<a href="?q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}">← Previous</a>{% endif %}
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?q={{ search|urlencode }}&page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+      </nav>
+    {% endif %}
+    <p class="user-history-note">Deactivating an account blocks sign-in while preserving registration and audit history.</p>
+  </section>
+</section>
+{% endblock %}
