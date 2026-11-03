@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9EEDD"/>
+      <stop offset="1" stop-color="#D4E1C5"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="418" y1="119" x2="814" y2="515" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6D46E"/>
+      <stop offset="1" stop-color="#FA9275"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#background)" d="M0 0h1200v630H0z"/>
+  <circle cx="613" cy="320" r="205" fill="url(#sun)"/>
+  <circle cx="613" cy="320" r="239" stroke="#28472D" stroke-opacity=".16" stroke-width="2"/>
+  <circle cx="613" cy="320" r="273" stroke="#28472D" stroke-opacity=".1" stroke-width="2"/>
+  <path d="m223 174 39 76 84 12-61 59 14 84-76-40-75 40 14-84-62-59 85-12 38-76Z" fill="#D7CDF8"/>
+  <path d="m935 354 112 194H823l112-194Z" fill="#FA9275"/>
+  <rect x="858" y="106" width="120" height="120" rx="26" transform="rotate(13 858 106)" fill="#C9EF74"/>
+  <circle cx="313" cy="493" r="31" fill="#fffefa" fill-opacity=".72"/>
+  <circle cx="1003" cy="270" r="18" fill="#28472D" fill-opacity=".35"/>
+  <path d="M0 558c171-81 289-89 417-22 151 80 273 78 418-3 118-66 246-59 365 13v84H0v-72Z" fill="#28472D" fill-opacity=".1"/>
+</svg>

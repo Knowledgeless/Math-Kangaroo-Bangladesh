@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Practice questions & past papers — Math Kangaroo Bangladesh{% endblock %}
+{% block content %}
+<section class="page-hero page-hero-peach"><div class="page-hero-inner"><span class="eyebrow">A little puzzle goes a long way</span><h1>Try a new<br><span class="text-green">way of thinking.</span></h1><p>Explore public practice questions and released past papers. Upcoming competition materials stay private.</p><span class="page-hero-shape" aria-hidden="true">×</span></div></section>
+<section class="section resources-section">
+  {% for kind,label,kind_resources in resource_groups %}{% if kind_resources %}<div class="resource-group"><div class="section-heading"><div><span class="eyebrow">Open resources</span><h2>{{ label }}{% if kind == "practice" %}s{% endif %}</h2></div></div><div class="resource-grid">{% for resource in kind_resources %}<article class="resource-card"><span class="resource-icon" aria-hidden="true">{% if kind == "solution" %}✓{% elif kind == "past_paper" %}▤{% else %}✳{% endif %}</span><span class="category-pill">{{ resource.get_kind_display }}</span><h3>{{ resource.title }}</h3><p>{{ resource.description }}</p>{% if resource.grade_min %}<span class="grade-chip">Grades {{ resource.grade_min }}{% if resource.grade_max and resource.grade_max != resource.grade_min %}–{{ resource.grade_max }}{% endif %}</span>{% endif %}{% if resource.resource_url %}<a class="text-link" href="{{ resource.resource_url }}" target="_blank" rel="noopener noreferrer">Open resource <span aria-hidden="true">↗</span></a>{% endif %}</article>{% endfor %}</div></div>{% endif %}{% endfor %}
+  {% if not resources %}<div class="empty-state empty-wide"><span class="empty-mark" aria-hidden="true">✳</span><h2>Practice materials are on their way</h2><p>Only approved, publicly released questions and papers will be shared here.</p></div>{% endif %}
+</section>
+{% endblock %}

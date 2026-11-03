@@ -1,0 +1,8 @@
+{% extends "staff_base.html" %}
+{% block title %}Website details — Content desk{% endblock %}
+{% block staff_page_label %}Website details{% endblock %}
+{% block staff_content %}
+<section class="cms-form-shell"><a class="back-link" href="{% url 'cms-dashboard' %}">← Content desk</a><div class="form-page-heading"><span class="eyebrow">Website details</span><h1>Set the right tone.</h1><p>These details appear across the public website.</p></div>
+  <form method="post" class="cms-form">{% csrf_token %}{% for field in form %}<div class="form-field field-full"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}<div class="form-actions"><button class="button button-dark" type="submit">Save website details</button></div></form>
+</section>
+{% endblock %}

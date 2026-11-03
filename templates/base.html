@@ -1,0 +1,82 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f6ef">
+  <meta name="description" content="{% block meta_description %}A joyful national mathematics challenge for curious students across Bangladesh.{% endblock %}">
+  <title>{% block title %}Math Kangaroo Bangladesh{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/site.css' %}">
+  <script src="{% static 'js/theme.js' %}" defer></script>
+  <script src="{% static 'js/site.js' %}" defer></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="{% url 'home' %}" aria-label="Math Kangaroo Bangladesh home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-copy"><strong>{{ site_settings.site_name|default:"Math Kangaroo Bangladesh" }}</strong></span>
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">
+        <span class="sr-only">Toggle navigation</span><span></span><span></span>
+      </button>
+      <nav class="primary-nav" id="primary-nav" aria-label="Main navigation">
+        <a href="{% url 'home' %}" {% if request.resolver_match.url_name == "home" %}aria-current="page"{% endif %}>Home</a>
+        <a href="{% url 'announcement-list' %}" {% if request.resolver_match.url_name == "announcement-list" or request.resolver_match.url_name == "announcement-detail" %}aria-current="page"{% endif %}>News</a>
+        <a href="{% url 'syllabus' %}" {% if request.resolver_match.url_name == "syllabus" %}aria-current="page"{% endif %}>Syllabus</a>
+        <a href="{% url 'questions' %}" {% if request.resolver_match.url_name == "questions" %}aria-current="page"{% endif %}>Practice</a>
+        <a href="{% url 'faq' %}" {% if request.resolver_match.url_name == "faq" %}aria-current="page"{% endif %}>FAQ</a>
+        <div class="nav-actions">
+          <button class="theme-toggle" type="button" aria-label="Switch color theme" title="Switch color theme">
+            <span class="theme-icon" aria-hidden="true">◐</span>
+          </button>
+          {% if user.is_authenticated %}
+            <a class="nav-dashboard" href="{% url 'accounts:dashboard' %}">My Dashboard</a>
+            <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">
+              {% csrf_token %}<button class="nav-login" type="submit">Log out</button>
+            </form>
+          {% else %}
+            <a class="nav-login" href="{% url 'accounts:login' %}">Login</a>
+            <a class="button button-small button-dark" href="{% url 'accounts:signup' %}">Register <span aria-hidden="true">↗</span></a>
+          {% endif %}
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  {% if messages %}
+    <div class="toast-stack" aria-live="polite" aria-relevant="additions removals">
+      {% for message in messages %}
+        <div class="toast-notification {% if 'success' in message.tags %}toast-success{% elif 'error' in message.tags %}toast-error{% elif 'warning' in message.tags %}toast-warning{% else %}toast-info{% endif %}" role="{% if 'error' in message.tags %}alert{% else %}status{% endif %}" data-toast>
+          <span>{{ message }}</span>
+          <button type="button" class="toast-dismiss" aria-label="Dismiss notification">×</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="brand brand-light" href="{% url 'home' %}">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="brand-copy"><strong>{{ site_settings.site_name|default:"Math Kangaroo Bangladesh" }}</strong></span>
+        </a>
+        <p>Big ideas start with a curious question.</p>
+      </div>
+      <div class="footer-links">
+        <div><strong>Explore</strong><a href="{% url 'announcement-list' %}">News & updates</a><a href="{% url 'syllabus' %}">Syllabus</a><a href="{% url 'questions' %}">Practice questions</a></div>
+        <div><strong>Helpful</strong><a href="{% url 'faq' %}">Frequently asked questions</a><a href="{% url 'accounts:signup' %}">Student registration</a><a href="{% url 'accounts:login' %}">Sign in</a></div>
+      </div>
+      <div class="footer-note"><span class="eyebrow eyebrow-light">Made for curious minds</span><p>{{ site_settings.tagline|default:"Celebrating creative problem-solving for students in grades 1–12." }}</p>{% if site_settings.contact_email %}<a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>{% endif %}<span class="footer-spark" aria-hidden="true">✳</span></div>
+    </div>
+    <div class="footer-bottom"><span>© {% now "Y" %} Math Kangaroo Bangladesh</span><span>Learn boldly. Think joyfully.</span></div>
+  </footer>
+</body>
+</html>

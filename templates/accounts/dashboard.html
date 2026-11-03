@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}My dashboard — Math Kangaroo Bangladesh{% endblock %}
+{% block content %}
+<section class="student-profile-layout">
+  {% include "accounts/_student_sidebar.html" %}
+  <div class="student-profile-content">
+    <div class="student-page-heading">
+      <div><span class="eyebrow">Participant portal{% if current_season %} · {{ current_season.year }} season{% endif %}</span><h1>Your Olympiad journey.</h1><p>One place for your participant profile and yearly competition records.</p></div>
+      <a class="button button-outline button-small" href="{% url 'accounts:profile' %}">Edit profile <span aria-hidden="true">↗</span></a>
+    </div>
+
+    <section class="student-profile-details">
+      <div class="student-profile-details-heading"><div><span class="eyebrow">Participant profile</span><h2>{{ user.get_full_name|default:"Your profile" }}</h2></div><span class="student-status-badge"><i></i> Account active</span></div>
+      <div class="student-profile-facts">
+        <div><span>Name</span><strong>{{ user.get_full_name|default:"Not added yet" }}</strong></div>
+        <div><span>Participant username</span><strong>{{ user.username }}</strong></div>
+        <div><span>Email</span><strong>{{ user.email|default:"Not added yet" }}</strong></div>
+        <div><span>Category</span><strong>{% if current_registration %}{{ current_registration.division.level.name }}{% elif registrations %}{{ registrations.0.division.level.name }}{% else %}Not registered yet{% endif %}</strong></div>
+        <div class="student-fact-wide"><span>Institute</span><strong>{% if current_registration %}{{ current_registration.school_name }}{% elif registrations %}{{ registrations.0.school_name }}{% else %}Add your institute during registration{% endif %}</strong></div>
+      </div>
+      <a class="student-inline-link" href="{% url 'accounts:profile' %}">View your full profile <span aria-hidden="true">↗</span></a>
+    </section>
+
+    {% if needs_current_registration %}
+      <section class="student-register-banner"><span class="student-register-icon" aria-hidden="true">✳</span><div><span class="eyebrow">Your next challenge</span><h2>Complete your {{ current_season.year }} registration.</h2><p>Your participant ID stays the same. Confirm this year's institute and grade to register.</p></div><a class="button button-dark" href="{% url 'accounts:annual-registration' %}">Register now <span aria-hidden="true">↗</span></a></section>
+    {% endif %}
+
+    <section class="student-participation-card">
+      <div class="student-card-heading"><div><span class="eyebrow">Year by year</span><h2>Competition participation</h2></div><a href="{% url 'accounts:registration-history' %}">Full history ↗</a></div>
+      <div class="student-participation-list">
+        {% for registration in registrations %}
+          <article class="student-participation-entry">
+            <span class="student-entry-symbol" aria-hidden="true">✳</span>
+            <div class="student-entry-copy"><h3>{{ registration.season.name }}</h3><span>{{ registration.division.level.name }} · Grade {{ registration.grade }}</span><span>{{ registration.school_name }}</span></div>
+            <div class="student-entry-status"><span class="status-pill status-{{ registration.status }}">{{ registration.get_status_display }}</span><small>Participant no.</small><strong>{{ registration.registration_number }}</strong></div>
+          </article>
+        {% empty %}
+          <div class="student-empty-participation"><span aria-hidden="true">◎</span><div><strong>Your first Olympiad participation starts here.</strong><p>When you register, this page will keep your institute, category and participant number together.</p>{% if current_season and current_season.is_registration_open %}<a class="student-inline-link" href="{% url 'accounts:annual-registration' %}">Register for {{ current_season.year }} <span aria-hidden="true">↗</span></a>{% endif %}</div></div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</section>
+
+{% if needs_current_registration %}<dialog class="registration-reminder" data-auto-open aria-labelledby="registration-reminder-title"><form method="dialog" class="dialog-close-form"><button class="dialog-close" aria-label="Close reminder">×</button></form><span class="reminder-spark" aria-hidden="true">✳</span><span class="eyebrow">A new year, a new challenge</span><h2 id="registration-reminder-title">Your {{ current_season.year }} Olympiad registration is ready.</h2><p>Your profile is here from last time. Confirm this year's institute and grade to join the competition.</p><div class="dialog-actions"><a class="button button-dark" href="{% url 'accounts:annual-registration' %}">Complete my registration <span aria-hidden="true">↗</span></a><button class="button button-outline" type="button" data-close-dialog>I'll do this later</button></div></dialog>{% endif %}
+{% endblock %}

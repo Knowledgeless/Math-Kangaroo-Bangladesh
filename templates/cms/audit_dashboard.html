@@ -1,0 +1,10 @@
+{% extends "staff_base.html" %}
+{% block title %}Audit log — Math Kangaroo Bangladesh{% endblock %}
+{% block staff_page_label %}Audit & activity{% endblock %}
+{% block staff_content %}
+<section class="cms-shell"><a class="back-link" href="{% url 'cms-dashboard' %}">← Content desk</a><div class="dashboard-heading"><div><span class="eyebrow">Accountability</span><h1>The audit trail.</h1><p>Administrative changes are recorded for review. This history cannot be edited here.</p></div></div>
+  <form method="get" class="filter-bar" role="search" data-live-search><label class="search-field"><span class="sr-only">Filter audit events</span><span aria-hidden="true">⌕</span><input type="search" name="action" value="{{ action_filter }}" placeholder="Filter by action"></label><button class="button button-icon button-small" type="submit" aria-label="Search audit events" title="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg></button></form>
+  <div class="cms-table-wrap"><table class="cms-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Record</th><th>Source IP</th></tr></thead><tbody>{% for event in page_obj %}<tr><td>{{ event.created_at|date:"M j, Y · H:i" }}</td><td>{% if event.actor %}{{ event.actor.email }}{% else %}System{% endif %}</td><td><strong>{{ event.action }}</strong></td><td>{{ event.model_name }} · {{ event.object_id }}</td><td>{{ event.ip_address|default:"—" }}</td></tr>{% empty %}<tr><td colspan="5" class="table-empty">No recorded changes yet.</td></tr>{% endfor %}</tbody></table></div>
+  {% if page_obj.has_other_pages %}<nav class="pagination" aria-label="Audit log pages">{% if page_obj.has_previous %}<a href="?action={{ action_filter|urlencode }}&page={{ page_obj.previous_page_number }}">← Previous</a>{% endif %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?action={{ action_filter|urlencode }}&page={{ page_obj.next_page_number }}">Next →</a>{% endif %}</nav>{% endif %}
+</section>
+{% endblock %}

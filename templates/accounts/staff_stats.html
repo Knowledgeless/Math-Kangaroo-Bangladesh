@@ -1,0 +1,72 @@
+{% extends "staff_base.html" %}
+{% block title %}Registration statistics — Math Kangaroo Bangladesh{% endblock %}
+{% block staff_page_label %}Registration statistics{% endblock %}
+{% block staff_content %}
+<section class="staff-stats-page">
+  <div class="staff-stats-heading">
+    <div><span class="eyebrow">Registration overview</span><h1>Participation, at a glance.</h1><p>{% if current_season %}{{ current_season.name }} · {% endif %}Live figures from saved competition registrations.</p></div>
+    {% if current_season %}<span class="stats-season-badge">{{ current_season.year }} season</span>{% endif %}
+  </div>
+  <div class="registration-stat-cards">
+    <article><span>Total registrations</span><strong>{{ total_registrations }}</strong><small>Across all seasons</small></article>
+    <article><span>Unique participants</span><strong>{{ total_students }}</strong><small>Registered at least once</small></article>
+    <article><span>Institutions</span><strong>{{ total_institutes }}</strong><small>Recorded school names</small></article>
+    <article><span>Current season</span><strong>{{ season_total }}</strong><small>New and returning participants</small></article>
+  </div>
+
+  <div class="registration-chart-grid">
+    <article class="registration-chart-card">
+      <div class="registration-chart-heading"><div><span class="eyebrow">Current season</span><h2>New & returning</h2></div><strong>{{ season_total }}</strong></div>
+      <div class="registration-donut-layout">
+        <div class="registration-donut" style="--donut-stops: {{ returning_donut }}"><span>{{ season_total }}<small>participants</small></span></div>
+        <div class="registration-legend">
+          <div><i class="legend-new"></i><span>New</span><strong>{{ new_students }}</strong><small>{{ new_percentage }}%</small></div>
+          <div><i class="legend-returning"></i><span>Returning</span><strong>{{ returning_students }}</strong><small>{{ returning_percentage }}%</small></div>
+        </div>
+      </div>
+    </article>
+    <article class="registration-chart-card">
+      <div class="registration-chart-heading"><div><span class="eyebrow">Current season</span><h2>Category breakdown</h2></div></div>
+      {% if category_rows %}
+        <div class="registration-donut-layout">
+          <div class="registration-donut" style="--donut-stops: {{ category_donut }}"><span>{{ season_total }}<small>registrations</small></span></div>
+          <div class="registration-legend">{% for row in category_rows %}<div><i style="--legend-color: {{ row.color }}"></i><span>{{ row.label }}</span><strong>{{ row.total }}</strong><small>{{ row.percentage }}%</small></div>{% endfor %}</div>
+        </div>
+      {% else %}<p class="stats-empty">No registrations for the current season yet.</p>{% endif %}
+    </article>
+  </div>
+
+  <article class="registration-chart-card registration-trend-card">
+    <div class="registration-chart-heading"><div><span class="eyebrow">Last 30 days</span><h2>Daily registrations</h2></div><strong>{{ max_daily }}<small> peak / day</small></strong></div>
+    <div class="registration-trend" role="img" aria-label="Daily registration counts for the last 30 days">
+      {% for row in trend_rows %}<div class="registration-trend-day" title="{{ row.date|date:'M j' }}: {{ row.total }}"><span style="height: {{ row.height }}%"></span><small>{% if forloop.first or forloop.counter == 8 or forloop.counter == 15 or forloop.counter == 22 or forloop.last %}{{ row.date|date:"M j" }}{% endif %}</small></div>{% endfor %}
+    </div>
+  </article>
+
+  <div class="registration-chart-grid">
+    <article class="registration-chart-card">
+      <div class="registration-chart-heading"><div><span class="eyebrow">Current season</span><h2>By grade</h2></div></div>
+      {% if grade_rows %}<div class="registration-bars">{% for row in grade_rows %}<div class="registration-bar-row"><span>Grade {{ row.label }}</span><div><i style="width: {{ row.bar_width }}%; --bar-color: {{ row.color }}"></i></div><strong>{{ row.total }}</strong></div>{% endfor %}</div>{% else %}<p class="stats-empty">No grade data yet.</p>{% endif %}
+    </article>
+    <article class="registration-chart-card">
+      <div class="registration-chart-heading"><div><span class="eyebrow">Current season</span><h2>By district</h2></div></div>
+      {% if district_rows %}
+        <div class="registration-donut-layout">
+          <div class="registration-donut" style="--donut-stops: {{ district_donut }}"><span>{{ season_total }}<small>registrations</small></span></div>
+          <div class="registration-legend">{% for row in district_rows %}<div><i style="--legend-color: {{ row.color }}"></i><span>{{ row.label }}</span><strong>{{ row.total }}</strong></div>{% endfor %}</div>
+        </div>
+      {% else %}<p class="stats-empty">District has not been provided for current-season participants.</p>{% endif %}
+    </article>
+  </div>
+
+  <div class="registration-chart-grid">
+    <article class="registration-chart-card">
+      <div class="registration-chart-heading"><div><span class="eyebrow">Current season · top 15</span><h2>Institutions</h2></div></div>
+      {% if institute_rows %}<div class="registration-bars">{% for row in institute_rows %}<div class="registration-bar-row"><span title="{{ row.label }}">{{ row.label }}</span><div><i style="width: {{ row.bar_width }}%; --bar-color: {{ row.color }}"></i></div><strong>{{ row.total }}</strong></div>{% endfor %}</div>{% else %}<p class="stats-empty">No institution names recorded yet.</p>{% endif %}
+    </article>
+    <article class="registration-chart-card stats-data-note">
+      <div><span class="eyebrow">Data availability</span><h2>Breakdowns not collected</h2><p>Gender and upazila figures are not shown because the current registration profile does not collect those fields. This avoids presenting guessed or misleading statistics.</p></div>
+    </article>
+  </div>
+</section>
+{% endblock %}
