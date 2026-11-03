@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block body_class %}staff-dashboard-page staff-console-page{% endblock %}
+{% block content %}
+<section class="staff-dashboard">
+  {% include "accounts/_staff_navigation.html" %}
+  <div class="staff-dashboard-content">
+    <div class="staff-toolbar">
+      <span class="staff-breadcrumb">Workspace <span aria-hidden="true">/</span> {% block staff_page_label %}{{ staff_page_label|default:"Staff tools" }}{% endblock %}</span>
+      <div class="staff-toolbar-user">
+        <span class="staff-user-avatar" aria-hidden="true">{{ request.user.first_name|first|upper|default:"S" }}</span>
+        <span><strong>{{ request.user.get_full_name|default:request.user.username }}</strong><small>{% if request.user.is_superuser %}Superuser{% else %}Staff{% endif %}</small></span>
+      </div>
+    </div>
+    <div class="staff-dashboard-inner">
+      {% block staff_content %}{% endblock %}
+    </div>
+  </div>
+</section>
+{% endblock %}

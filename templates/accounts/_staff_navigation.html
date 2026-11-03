@@ -1,0 +1,24 @@
+<aside class="staff-sidebar">
+  <a class="staff-brand" href="{% url 'home' %}" aria-label="Math Kangaroo Bangladesh home">
+    <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+    <span><strong>Math Kangaroo</strong><small>Bangladesh · Staff</small></span>
+  </a>
+  <span class="staff-nav-caption">Workspace</span>
+  <nav class="staff-navigation" aria-label="Staff workspace">
+    <a class="staff-nav-link {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}" href="{% url 'accounts:dashboard' %}"><span aria-hidden="true">⌂</span> Dashboard</a>
+    {% if perms.competitions.view_competitionregistration %}<a class="staff-nav-link {% if request.resolver_match.url_name == 'staff-stats' %}is-active{% endif %}" href="{% url 'accounts:staff-stats' %}"><span aria-hidden="true">▥</span> Stats</a>{% endif %}
+    {% if can_manage_content or perms.cms.view_announcement %}<a class="staff-nav-link {% if request.resolver_match.url_name == 'cms-dashboard' or request.resolver_match.url_name == 'cms-site-settings' or request.resolver_match.url_name == 'cms-announcement-create' or request.resolver_match.url_name == 'cms-announcement-edit' or request.resolver_match.url_name == 'cms-announcement-archive' or request.resolver_match.url_name == 'cms-faq-create' or request.resolver_match.url_name == 'cms-faq-edit' %}is-active{% endif %}" href="{% url 'cms-dashboard' %}"><span aria-hidden="true">▤</span> Content management</a>{% endif %}
+    {% if can_manage_users or perms.accounts.view_user %}<a class="staff-nav-link {% if request.resolver_match.url_name == 'staff-users' or request.resolver_match.url_name == 'staff-user-edit' %}is-active{% endif %}" href="{% url 'accounts:staff-users' %}"><span aria-hidden="true">◎</span> Participants & users</a>{% endif %}
+    {% if can_view_activity or perms.audit.view_auditlog %}<a class="staff-nav-link {% if request.resolver_match.url_name == 'audit-dashboard' %}is-active{% endif %}" href="{% url 'audit-dashboard' %}"><span aria-hidden="true">◷</span> Audit & activity</a>{% endif %}
+  </nav>
+  <div class="staff-sidebar-season">
+    <span class="staff-nav-caption">Current season</span>
+    {% if current_season %}
+      <strong>{{ current_season.year }} Olympiad</strong>
+      <span class="season-status"><i class="{% if season_is_open %}is-open{% endif %}"></i>{{ current_season.get_status_display }}</span>
+    {% else %}
+      <strong>Season to be announced</strong>
+    {% endif %}
+  </div>
+  <form method="post" action="{% url 'accounts:logout' %}" class="staff-logout">{% csrf_token %}<button type="submit"><span aria-hidden="true">↪</span> Sign out</button></form>
+</aside>

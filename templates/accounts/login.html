@@ -1,0 +1,12 @@
+{% extends "accounts/form_base.html" %}
+{% block title %}Participant login — Math Kangaroo Bangladesh{% endblock %}
+{% block form_eyebrow %}Welcome back{% endblock %}
+{% block form_title %}Your ideas are waiting.{% endblock %}
+{% block form_intro %}Log in with the participant username from your registration and your password.{% endblock %}
+{% block form_content %}
+{% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+<form method="post" class="form-stack" novalidate>{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+  {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}
+  <button class="button button-dark button-full" type="submit">Login <span aria-hidden="true">↗</span></button>
+</form><a class="auth-small-link" href="{% url 'accounts:password_reset' %}">Forgot your password? Reset with your registration email.</a><p class="auth-switch">New participant? <a href="{% url 'accounts:signup' %}">Register for this year's Olympiad</a></p>
+{% endblock %}

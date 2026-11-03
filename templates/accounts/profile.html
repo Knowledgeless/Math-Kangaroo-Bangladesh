@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}My profile — Math Kangaroo Bangladesh{% endblock %}
+{% block content %}
+<section class="student-profile-layout">
+  {% include "accounts/_student_sidebar.html" %}
+  <div class="student-profile-content">
+    <div class="student-page-heading">
+      <div><span class="eyebrow">Participant profile</span><h1>Your personal details.</h1><p>Your participant username remains the same throughout your Olympiad journey.</p></div>
+      <a class="button button-outline button-small" href="{% url 'accounts:dashboard' %}">Back to overview <span aria-hidden="true">↗</span></a>
+    </div>
+
+    <section class="student-profile-details">
+      <div class="student-profile-details-heading"><div><span class="eyebrow">Account information</span><h2>{{ user.get_full_name|default:"Student profile" }}</h2></div><span class="student-id-pill">ID · {{ user.username }}</span></div>
+      {% if can_edit %}
+        <div class="profile-edit-notice"><strong>Profile editing is open{% if season %} for {{ season.year }}{% endif %}.</strong><span>You can update your details until {{ season.profile_edit_close_at|date:"F j, Y · H:i" }}. Institute and grade are set separately for each Olympiad year.</span></div>
+        {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <form method="post" class="student-profile-edit-form">{% csrf_token %}
+          {% for field in form %}
+            <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error" role="alert">{{ error }}</p>{% endfor %}</div>
+          {% endfor %}
+          <button class="button button-dark" type="submit">Save profile changes <span aria-hidden="true">↗</span></button>
+        </form>
+      {% else %}
+        <div class="profile-edit-locked"><span class="detail-symbol" aria-hidden="true">◷</span><div><strong>Profile editing is closed</strong><p>{% if season %}Your details are read-only outside the edit dates set by the Olympiad team. Contact the organizers if an important correction is needed.{% else %}Profile editing dates have not been set. Contact the Olympiad team if an important correction is needed.{% endif %}</p></div></div>
+        <div class="student-profile-facts student-profile-facts-detailed">
+          <div><span>Full name</span><strong>{{ user.get_full_name|default:"—" }}</strong></div>
+          <div><span>Participant username</span><strong>{{ user.username }}</strong></div>
+          <div><span>Email address</span><strong>{{ user.email|default:"—" }}</strong></div>
+          <div><span>Date of birth</span><strong>{{ profile.date_of_birth|date:"F j, Y"|default:"—" }}</strong></div>
+          <div><span>Student phone</span><strong>{{ profile.phone|default:"—" }}</strong></div>
+          <div><span>Parent or guardian</span><strong>{{ profile.guardian_name|default:"—" }}</strong></div>
+          <div><span>Guardian phone</span><strong>{{ profile.guardian_phone|default:"—" }}</strong></div>
+          <div><span>District</span><strong>{{ profile.district|default:"—" }}</strong></div>
+          {% if current_registration %}<div class="student-fact-wide"><span>Current institute · {{ current_registration.season.year }}</span><strong>{{ current_registration.school_name }} · {{ current_registration.division.level.name }}, Grade {{ current_registration.grade }}</strong></div>{% endif %}
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="student-participation-card">
+      <div class="student-card-heading"><div><span class="eyebrow">Year by year</span><h2>Competition participation</h2></div><a href="{% url 'accounts:registration-history' %}">Full history ↗</a></div>
+      <div class="student-participation-list">
+        {% for registration in registrations %}
+          <article class="student-participation-entry">
+            <span class="student-entry-symbol" aria-hidden="true">✳</span>
+            <div class="student-entry-copy"><h3>{{ registration.season.name }}</h3><span>{{ registration.division.level.name }} · Grade {{ registration.grade }}</span><span>{{ registration.school_name }}</span></div>
+            <div class="student-entry-status"><span class="status-pill status-{{ registration.status }}">{{ registration.get_status_display }}</span><small>Participant no.</small><strong>{{ registration.registration_number }}</strong></div>
+          </article>
+        {% empty %}<p class="student-empty-note">Your Olympiad participation details will appear here after registration.</p>{% endfor %}
+      </div>
+    </section>
+  </div>
+</section>
+{% endblock %}
