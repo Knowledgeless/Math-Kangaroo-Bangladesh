@@ -1,6 +1,12 @@
 # Math Kangaroo Bangladesh — Project progress
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
+
+## Completed work — hero slider transitions
+
+- Added five distinct smooth entrance effects to the homepage hero images. Effects rotate by slide position, so later slides use varied transitions without additional configuration.
+- Replays the selected entrance effect on each slide change, including manual navigation; existing four-second autoplay and reduced-motion behavior remain unchanged.
+- Verified JavaScript syntax, carousel advancement and looping, and the CMS hero-slider regression tests.
 
 ## Completed work — dashboard redesign and notification verification
 

@@ -12,20 +12,46 @@
   document.querySelectorAll("[data-hero-slider]").forEach((slider) => {
     const slides = [...slider.querySelectorAll("[data-hero-slide]")];
     const position = slider.querySelector("[data-hero-position]");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const slideEffects = [
+      "hero-slide-effect-fade",
+      "hero-slide-effect-from-right",
+      "hero-slide-effect-from-left",
+      "hero-slide-effect-zoom",
+      "hero-slide-effect-reveal",
+    ];
     let activeIndex = 0;
+    let timer;
     const showSlide = (nextIndex) => {
       activeIndex = (nextIndex + slides.length) % slides.length;
       slides.forEach((slide, index) => {
+        slide.classList.remove(...slideEffects);
         slide.hidden = index !== activeIndex;
       });
+      const activeSlide = slides[activeIndex];
+      if (activeSlide) {
+        void activeSlide.offsetWidth;
+        activeSlide.classList.add(slideEffects[activeIndex % slideEffects.length]);
+      }
       if (position) position.textContent = `${activeIndex + 1} of ${slides.length}`;
+    };
+    const stopAutoplay = () => window.clearInterval(timer);
+    const startAutoplay = () => {
+      stopAutoplay();
+      if (slides.length > 1 && !reducedMotion.matches && !document.hidden) {
+        timer = window.setInterval(() => showSlide(activeIndex + 1), 4000);
+      }
     };
     slider.querySelector("[data-hero-previous]")?.addEventListener("click", () => {
       showSlide(activeIndex - 1);
+      startAutoplay();
     });
     slider.querySelector("[data-hero-next]")?.addEventListener("click", () => {
       showSlide(activeIndex + 1);
+      startAutoplay();
     });
+    document.addEventListener("visibilitychange", startAutoplay);
+    startAutoplay();
   });
 
   document.querySelectorAll(".hero-file-input").forEach((input) => {

@@ -377,7 +377,7 @@ class HeroSlideManagementTests(TestCase):
     def test_homepage_uses_image_only_placeholder_when_no_slide_is_published(self):
         response = self.client.get(reverse("home"))
 
-        self.assertContains(response, "images/hero-placeholder.svg")
+        self.assertContains(response, "images/homepage-hero-classroom.jpg")
         self.assertNotContains(response, "Think boldly.")
         self.assertNotContains(response, "Solve joyfully.")
 
