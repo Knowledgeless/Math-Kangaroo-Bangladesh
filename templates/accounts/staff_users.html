@@ -46,7 +46,7 @@
             <tr>
               <td><a href="{% url 'accounts:staff-user-edit' account.pk %}" aria-label="Edit {{ account.get_full_name|default:account.username }}" title="Edit user"><small>@{{ account.username }}</small></a></td>
               <td><strong>{{ account.get_full_name|default:account.username }}</strong></td>
-              <td>{{ account.email|default:"No email" }}{% if account.student_profile.phone %} | {{ account.student_profile.phone }}{% endif %}{% with latest_registration=account.competition_registrations.all|first %}{% if latest_registration %}<small>{{ latest_registration.school_name }}</small>{% endif %}{% endwith %}</td>
+              <td>{{ account.email|default:"No email" }}{% if account.student_profile.phone %} | {{ account.student_profile.phone }}{% endif %}{% with latest_registration=account.competition_registrations.all|first %}{% if latest_registration %}{% endif %}{% endwith %}</td>
               {% comment %} <td>{% with latest_registration=account.competition_registrations.all|first %}{% if latest_registration %}<strong>{{ latest_registration.school_name }}</strong><small>{{ latest_registration.season.year }} · Grade {{ latest_registration.grade }}</small>{% else %}—{% endif %}{% endwith %}</td> 
               <td><span class="status-pill">{% if account.is_superuser %}Superuser{% elif account.is_staff %}Staff{% else %}{{ account.get_role_display }}{% endif %}</span><small class="{% if account.is_active %}account-active{% else %}account-inactive{% endif %}">{% if account.is_active %}Active{% else %}Inactive{% endif %}</small></td>{% endcomment %}
               
