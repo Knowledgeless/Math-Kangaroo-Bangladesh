@@ -9,7 +9,7 @@
           <p>Manage participants, registrations and competition content from one place.</p>
         </div>
         <div class="staff-welcome-art" aria-hidden="true">
-          <span class="staff-art-sun">✳</span><span class="staff-art-orbit"></span><span class="staff-art-star">✦</span>
+          <i class="staff-art-sun bi bi-sun" aria-hidden="true"></i><span class="staff-art-orbit"></span><i class="staff-art-star bi bi-stars" aria-hidden="true"></i>
           <span class="staff-art-equation">1 + 1 = 2</span><span class="staff-art-shape"></span>
         </div>
       </section>
@@ -18,7 +18,7 @@
         <section class="staff-stat-grid" aria-label="Competition overview">
           {% for stat in stats %}
             <article class="staff-stat-card staff-stat-{{ stat.tone }}">
-              <span class="staff-stat-icon" aria-hidden="true">{{ stat.icon }}</span>
+              <i class="staff-stat-icon bi bi-{{ stat.icon }}" aria-hidden="true"></i>
               <span class="staff-stat-label">{{ stat.label }}</span>
               <strong>{{ stat.value }}</strong>
               <small>{{ stat.detail }}</small>
@@ -30,7 +30,7 @@
       <section class="staff-dashboard-grid">
         {% if can_view_registrations %}
           <article class="staff-panel staff-registration-chart" id="registration-overview">
-            <div class="staff-panel-heading"><div><span class="eyebrow">Last 12 months</span><h2>Registration overview</h2></div><span class="staff-panel-mark" aria-hidden="true">↗</span></div>
+            <div class="staff-panel-heading"><div><span class="eyebrow">Last 12 months</span><h2>Registration overview</h2></div><i class="staff-panel-mark bi bi-bar-chart-line" aria-hidden="true"></i></div>
             <div class="chart-legend"><span><i class="legend-registration"></i> Competition registrations</span>{% if can_manage_users %}<span><i class="legend-account"></i> New accounts</span>{% endif %}</div>
             <div class="staff-bar-chart" role="img" aria-label="Monthly registrations and account creation over the last 12 months">
               {% for month in monthly_values %}<div class="staff-chart-month"><div class="staff-chart-bars"><i class="chart-bar chart-bar-registration" style="--bar-height:{{ month.registration_height }}%"></i>{% if can_manage_users %}<i class="chart-bar chart-bar-account" style="--bar-height:{{ month.account_height }}%"></i>{% endif %}</div><span>{{ month.label }}</span></div>{% endfor %}
@@ -46,12 +46,12 @@
           </article>
 
           <article class="staff-panel staff-quick-panel">
-            <div class="staff-panel-heading"><div><span class="eyebrow">Get things done</span><h2>Quick actions</h2></div><span class="staff-panel-mark" aria-hidden="true">↗</span></div>
+            <div class="staff-panel-heading"><div><span class="eyebrow">Get things done</span><h2>Quick actions</h2></div><i class="staff-panel-mark bi bi-lightning" aria-hidden="true"></i></div>
             <div class="staff-quick-grid">
-              {% if can_manage_users %}<a class="staff-quick-action quick-lime" href="{% url 'accounts:staff-users' %}"><span aria-hidden="true">◎</span><strong>Manage users</strong><small>Find and update accounts</small></a>{% endif %}
-              {% if can_manage_content %}<a class="staff-quick-action quick-lilac" href="{% url 'cms-dashboard' %}"><span aria-hidden="true">▤</span><strong>Manage content</strong><small>News, FAQs and homepage</small></a>{% endif %}
-              {% if can_view_registrations %}<a class="staff-quick-action quick-yellow" href="#registration-overview"><span aria-hidden="true">✳</span><strong>View registrations</strong><small>Season overview and trends</small></a>{% endif %}
-              {% if can_view_activity %}<a class="staff-quick-action quick-peach" href="{% url 'audit-dashboard' %}"><span aria-hidden="true">◷</span><strong>Review activity</strong><small>Staff action history</small></a>{% endif %}
+              {% if can_manage_users %}<a class="staff-quick-action quick-lime" href="{% url 'accounts:staff-users' %}"><i class="bi bi-people" aria-hidden="true"></i><strong>Manage users</strong><small>Find and update accounts</small></a>{% endif %}
+              {% if can_manage_content %}<a class="staff-quick-action quick-lilac" href="{% url 'cms-dashboard' %}"><i class="bi bi-journal-text" aria-hidden="true"></i><strong>Manage content</strong><small>News, FAQs and homepage</small></a>{% endif %}
+              {% if can_view_registrations %}<a class="staff-quick-action quick-yellow" href="#registration-overview"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><strong>View registrations</strong><small>Season overview and trends</small></a>{% endif %}
+              {% if can_view_activity %}<a class="staff-quick-action quick-peach" href="{% url 'audit-dashboard' %}"><i class="bi bi-clock-history" aria-hidden="true"></i><strong>Review activity</strong><small>Staff action history</small></a>{% endif %}
             </div>
           </article>
 
@@ -63,16 +63,16 @@
           <article class="staff-panel staff-quick-panel staff-no-registration-access">
             <div class="staff-panel-heading"><div><span class="eyebrow">Your permissions</span><h2>Staff tools</h2></div></div>
             <div class="staff-quick-grid">
-              {% if can_manage_users %}<a class="staff-quick-action quick-lime" href="{% url 'accounts:staff-users' %}"><span aria-hidden="true">◎</span><strong>Manage users</strong><small>Find and update accounts</small></a>{% endif %}
-              {% if can_manage_content %}<a class="staff-quick-action quick-lilac" href="{% url 'cms-dashboard' %}"><span aria-hidden="true">▤</span><strong>Manage content</strong><small>News, FAQs and homepage</small></a>{% endif %}
-              {% if can_view_activity %}<a class="staff-quick-action quick-peach" href="{% url 'audit-dashboard' %}"><span aria-hidden="true">◷</span><strong>Review activity</strong><small>Staff action history</small></a>{% endif %}
+              {% if can_manage_users %}<a class="staff-quick-action quick-lime" href="{% url 'accounts:staff-users' %}"><i class="bi bi-people" aria-hidden="true"></i><strong>Manage users</strong><small>Find and update accounts</small></a>{% endif %}
+              {% if can_manage_content %}<a class="staff-quick-action quick-lilac" href="{% url 'cms-dashboard' %}"><i class="bi bi-journal-text" aria-hidden="true"></i><strong>Manage content</strong><small>News, FAQs and homepage</small></a>{% endif %}
+              {% if can_view_activity %}<a class="staff-quick-action quick-peach" href="{% url 'audit-dashboard' %}"><i class="bi bi-clock-history" aria-hidden="true"></i><strong>Review activity</strong><small>Staff action history</small></a>{% endif %}
               {% if not can_manage_users and not can_manage_content and not can_view_activity %}<p class="staff-empty-note">No staff tools are assigned to your account yet. Ask an administrator to review your staff groups.</p>{% endif %}
             </div>
           </article>
         {% endif %}
 
         <article class="staff-panel staff-activity-panel">
-          <div class="staff-panel-heading"><div><span class="eyebrow">Latest updates</span><h2>Recent activity</h2></div>{% if can_view_activity %}<a class="staff-panel-link" href="{% url 'audit-dashboard' %}">View all ↗</a>{% endif %}</div>
+          <div class="staff-panel-heading"><div><span class="eyebrow">Latest updates</span><h2>Recent activity</h2></div>{% if can_view_activity %}<a class="staff-panel-link" href="{% url 'audit-dashboard' %}">View all <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>{% endif %}</div>
           {% if can_view_activity %}
             <ul class="staff-activity-list">{% for event in recent_activity %}<li><span class="activity-marker"></span><div><strong>{{ event.action|title|cut:"." }}</strong><span>{% if event.actor %}{{ event.actor.get_full_name|default:event.actor.username }}{% else %}System{% endif %} · {{ event.model_name }}</span></div><time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|timesince }} ago</time></li>{% empty %}<li class="staff-empty-note">No staff activity has been recorded yet.</li>{% endfor %}</ul>
           {% else %}
@@ -81,7 +81,7 @@
         </article>
 
         <article class="staff-season-card">
-          <div class="staff-season-card-top"><span class="season-indicator"><i class="{% if season_is_open %}is-open{% endif %}"></i>{% if season_is_open %}Registration open{% elif current_season %}{{ current_season.get_status_display }}{% else %}No active season{% endif %}</span><span aria-hidden="true">✳</span></div>
+          <div class="staff-season-card-top"><span class="season-indicator"><i class="{% if season_is_open %}is-open{% endif %}"></i>{% if season_is_open %}Registration open{% elif current_season %}{{ current_season.get_status_display }}{% else %}No active season{% endif %}</span><i class="bi bi-stars" aria-hidden="true"></i></div>
           {% if current_season %}<h2>{{ current_season.name }}</h2><p>Review participant trends and keep the season's content and account information up to date.</p>{% else %}<h2>The next challenge awaits.</h2><p>The Olympiad team will show the next season here when it is announced.</p>{% endif %}
         </article>
       </section>

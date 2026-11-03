@@ -6,7 +6,7 @@
   <div class="student-profile-content">
     <div class="student-page-heading">
       <div><span class="eyebrow">Participant profile</span><h1>Your personal details.</h1><p>Your participant username remains the same throughout your Olympiad journey.</p></div>
-      <a class="button button-outline button-small" href="{% url 'accounts:dashboard' %}">Back to overview <span aria-hidden="true">↗</span></a>
+      <a class="button button-outline button-small" href="{% url 'accounts:dashboard' %}">Back to overview <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
     </div>
 
     <section class="student-profile-details">
@@ -18,10 +18,10 @@
           {% for field in form %}
             <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error" role="alert">{{ error }}</p>{% endfor %}</div>
           {% endfor %}
-          <button class="button button-dark" type="submit">Save profile changes <span aria-hidden="true">↗</span></button>
+          <button class="button button-dark" type="submit">Save profile changes <i class="bi bi-arrow-up-right" aria-hidden="true"></i></button>
         </form>
       {% else %}
-        <div class="profile-edit-locked"><span class="detail-symbol" aria-hidden="true">◷</span><div><strong>Profile editing is closed</strong><p>{% if season %}Your details are read-only outside the edit dates set by the Olympiad team. Contact the organizers if an important correction is needed.{% else %}Profile editing dates have not been set. Contact the Olympiad team if an important correction is needed.{% endif %}</p></div></div>
+        <div class="profile-edit-locked"><i class="detail-symbol bi bi-clock-history" aria-hidden="true"></i><div><strong>Profile editing is closed</strong><p>{% if season %}Your details are read-only outside the edit dates set by the Olympiad team. Contact the organizers if an important correction is needed.{% else %}Profile editing dates have not been set. Contact the Olympiad team if an important correction is needed.{% endif %}</p></div></div>
         <div class="student-profile-facts student-profile-facts-detailed">
           <div><span>Full name</span><strong>{{ user.get_full_name|default:"—" }}</strong></div>
           <div><span>Participant username</span><strong>{{ user.username }}</strong></div>
@@ -37,11 +37,11 @@
     </section>
 
     <section class="student-participation-card">
-      <div class="student-card-heading"><div><span class="eyebrow">Year by year</span><h2>Competition participation</h2></div><a href="{% url 'accounts:registration-history' %}">Full history ↗</a></div>
+      <div class="student-card-heading"><div><span class="eyebrow">Year by year</span><h2>Competition participation</h2></div><a href="{% url 'accounts:registration-history' %}">Full history <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></div>
       <div class="student-participation-list">
         {% for registration in registrations %}
           <article class="student-participation-entry">
-            <span class="student-entry-symbol" aria-hidden="true">✳</span>
+            <i class="student-entry-symbol bi bi-trophy" aria-hidden="true"></i>
             <div class="student-entry-copy"><h3>{{ registration.season.name }}</h3><span>{{ registration.division.level.name }} · Grade {{ registration.grade }}</span><span>{{ registration.school_name }}</span></div>
             <div class="student-entry-status"><span class="status-pill status-{{ registration.status }}">{{ registration.get_status_display }}</span><small>Participant no.</small><strong>{{ registration.registration_number }}</strong></div>
           </article>

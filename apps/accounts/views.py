@@ -173,14 +173,14 @@ def _staff_dashboard_context(request):
                     ).count(),
                     "detail": "Active participant accounts",
                     "tone": "lime",
-                    "icon": "✳",
+                    "icon": "people-fill",
                 },
                 {
                     "label": "New accounts",
                     "value": User.objects.filter(date_joined__gte=now - timedelta(days=30)).count(),
                     "detail": "Joined in the last 30 days",
                     "tone": "yellow",
-                    "icon": "↗",
+                    "icon": "person-plus-fill",
                 },
             ]
         )
@@ -192,7 +192,7 @@ def _staff_dashboard_context(request):
                 "value": registrations.count(),
                 "detail": "All seasons",
                 "tone": "coral",
-                "icon": "▤",
+                "icon": "journal-check",
             }
         )
         if current_season:
@@ -202,7 +202,7 @@ def _staff_dashboard_context(request):
                     "value": registrations.filter(season=current_season).count(),
                     "detail": current_season.get_status_display(),
                     "tone": "lilac",
-                    "icon": "◎",
+                    "icon": "person-check-fill",
                 }
             )
 

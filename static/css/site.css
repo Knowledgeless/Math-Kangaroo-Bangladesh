@@ -307,3 +307,25 @@ h3 { font-size: 1.35rem; font-weight: 750; }
   .user-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }.user-stat-card { min-height: 95px; padding: 13px; }.staff-user-form { grid-template-columns: 1fr; padding: 18px; }.staff-user-identity, .staff-user-form-note, .staff-user-form-actions { grid-column: 1 / -1; }.toast-stack { top: 88px; right: 16px; }
   .registration-hero { min-height: 0; padding: 45px 22px; }.registration-hero-art { width: 110px; height: 110px; flex-basis: 110px; margin-left: 8px; }.registration-medal { width: 64px; height: 64px; font-size: 2rem; }.registration-spark { width: 38px; height: 38px; font-size: 1.1rem; }.registration-hero-copy h1 { font-size: 2.85rem; }.registration-hero-copy p { font-size: .82rem; }.registration-progress { width: calc(100% - 34px); gap: 6px; }.registration-progress > i { width: 18px; }.progress-step { gap: 5px; }.progress-step > span { width: 24px; height: 24px; flex: 0 0 24px; }.progress-step strong { font-size: .58rem; }.registration-layout { width: calc(100% - 32px); grid-template-columns: 1fr; margin-bottom: 60px; }.registration-form-panel, .registration-details-card, .registration-help-card { padding: 20px; }.registration-form { grid-template-columns: 1fr; }.registration-form .form-field-half { grid-column: 1 / -1; }.profile-form { grid-template-columns: 1fr; padding: 17px; }.profile-form > .form-field, .profile-form > .form-field:nth-child(4), .profile-form > button { grid-column: 1 / -1; }.profile-facts-readonly { grid-template-columns: 1fr; }.participation-row-expanded { gap: 10px; }.back-link { margin-bottom: 10px; }
 }
+
+i.bi { font-style: normal; }
+.nav-toggle > .bi { font-size: 1.35rem; line-height: 1; }
+.theme-icon.bi { font-size: 1rem; }
+.toast-dismiss .bi { font-size: .75rem; }
+.search-field > .bi { flex: 0 0 auto; font-size: .9rem; }
+.button-icon > .bi, .action-icon > .bi { font-size: 1rem; }
+.hero-cover-thumb .bi { font-size: .82rem; line-height: 1; }
+.related-list > a > .bi { color: var(--green-dark); }
+.article-end > .bi { color: var(--coral); font-size: 1.7rem; }
+.why-points > div > .bi { flex: 0 0 auto; color: var(--green); font-size: .7rem; }
+.syllabus-card li > .bi { padding-top: 1px; font-size: .75rem; }
+.empty-mark.bi { font-size: 1.25rem; }
+.faq-item summary > .faq-toggle-icon { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border: 1px solid var(--line); border-radius: 50%; font-size: .72rem; transition: transform .16s ease; }
+.faq-item[open] summary > .faq-toggle-icon { transform: rotate(45deg); }
+.staff-nav-link > .bi { width: 18px; flex: 0 0 18px; color: #c9ef74; font-size: 1rem; text-align: center; }
+.staff-nav-link.is-active > .bi, .staff-nav-link:hover > .bi { color: #203328; }
+.student-profile-nav a > .bi { width: 17px; flex: 0 0 17px; color: var(--green-dark); font-size: .95rem; text-align: center; }
+.staff-quick-action > .bi { font-size: 1rem; line-height: 1; }
+.student-empty-participation > .bi { flex: 0 0 auto; color: var(--green-dark); font-size: 1.4rem; }
+.news-card-art > span > .bi { font-size: 4.5rem; }
+.progress-step.is-complete > span > .bi { font-size: .8rem; }

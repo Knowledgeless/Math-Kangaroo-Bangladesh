@@ -8,6 +8,7 @@
   <meta name="description" content="{% block meta_description %}A joyful national mathematics challenge for curious students across Bangladesh.{% endblock %}">
   <title>{% block title %}Math Kangaroo Bangladesh{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/site.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
   <script src="{% static 'js/theme.js' %}" defer></script>
   <script src="{% static 'js/site.js' %}" defer></script>
 </head>
@@ -20,7 +21,7 @@
         <span class="brand-copy"><strong>{{ site_settings.site_name|default:"Math Kangaroo Bangladesh" }}</strong></span>
       </a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">
-        <span class="sr-only">Toggle navigation</span><span></span><span></span>
+        <span class="sr-only">Toggle navigation</span><i class="bi bi-list" aria-hidden="true"></i>
       </button>
       <nav class="primary-nav" id="primary-nav" aria-label="Main navigation">
         <a href="{% url 'home' %}" {% if request.resolver_match.url_name == "home" %}aria-current="page"{% endif %}>Home</a>
@@ -30,7 +31,7 @@
         <a href="{% url 'faq' %}" {% if request.resolver_match.url_name == "faq" %}aria-current="page"{% endif %}>FAQ</a>
         <div class="nav-actions">
           <button class="theme-toggle" type="button" aria-label="Switch color theme" title="Switch color theme">
-            <span class="theme-icon" aria-hidden="true">◐</span>
+            <i class="theme-icon bi bi-moon-stars" aria-hidden="true"></i>
           </button>
           {% if user.is_authenticated %}
             <a class="nav-dashboard" href="{% url 'accounts:dashboard' %}">My Dashboard</a>
@@ -39,7 +40,7 @@
             </form>
           {% else %}
             <a class="nav-login" href="{% url 'accounts:login' %}">Login</a>
-            <a class="button button-small button-dark" href="{% url 'accounts:signup' %}">Register <span aria-hidden="true">↗</span></a>
+            <a class="button button-small button-dark" href="{% url 'accounts:signup' %}">Register <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
           {% endif %}
         </div>
       </nav>
@@ -51,7 +52,7 @@
       {% for message in messages %}
         <div class="toast-notification {% if 'success' in message.tags %}toast-success{% elif 'error' in message.tags %}toast-error{% elif 'warning' in message.tags %}toast-warning{% else %}toast-info{% endif %}" role="{% if 'error' in message.tags %}alert{% else %}status{% endif %}" data-toast>
           <span>{{ message }}</span>
-          <button type="button" class="toast-dismiss" aria-label="Dismiss notification">×</button>
+          <button type="button" class="toast-dismiss" aria-label="Dismiss notification"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
         </div>
       {% endfor %}
     </div>
@@ -74,7 +75,7 @@
         <div><strong>Explore</strong><a href="{% url 'announcement-list' %}">News & updates</a><a href="{% url 'syllabus' %}">Syllabus</a><a href="{% url 'questions' %}">Practice questions</a></div>
         <div><strong>Helpful</strong><a href="{% url 'faq' %}">Frequently asked questions</a><a href="{% url 'accounts:signup' %}">Student registration</a><a href="{% url 'accounts:login' %}">Sign in</a></div>
       </div>
-      <div class="footer-note"><span class="eyebrow eyebrow-light">Made for curious minds</span><p>{{ site_settings.tagline|default:"Celebrating creative problem-solving for students in grades 1–12." }}</p>{% if site_settings.contact_email %}<a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>{% endif %}<span class="footer-spark" aria-hidden="true">✳</span></div>
+      <div class="footer-note"><span class="eyebrow eyebrow-light">Made for curious minds</span><p>{{ site_settings.tagline|default:"Celebrating creative problem-solving for students in grades 1–12." }}</p>{% if site_settings.contact_email %}<a href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>{% endif %}<i class="footer-spark bi bi-stars" aria-hidden="true"></i></div>
     </div>
     <div class="footer-bottom"><span>© {% now "Y" %} Math Kangaroo Bangladesh</span><span>Learn boldly. Think joyfully.</span></div>
   </footer>

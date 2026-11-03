@@ -3,7 +3,7 @@
 {% block content %}
 <section class="registration-hero">
   <div class="registration-hero-copy"><span class="eyebrow">Your next big idea starts here</span><h1>{% if season %}Join the {{ season.year }}<br><span class="text-green">Math Olympiad.</span>{% else %}Your next challenge<br><span class="text-green">is on its way.</span>{% endif %}</h1><p>Create your student profile and register for this year's Olympiad in one step. Your participant ID becomes your website username.</p></div>
-  <div class="registration-hero-art" aria-hidden="true"><div class="registration-orbit"></div><div class="registration-medal">✳</div><div class="registration-spark">?</div></div>
+  <div class="registration-hero-art" aria-hidden="true"><div class="registration-orbit"></div><i class="registration-medal bi bi-stars"></i><i class="registration-spark bi bi-question-lg"></i></div>
 </section>
 
 {% if can_register %}
@@ -17,16 +17,16 @@
         {% if field.name == "school_name" %}<div class="registration-divider"><span class="eyebrow">This year's Olympiad</span><p>Your school and class are saved with this year's record. You can update your profile during the dates set by the organizers.</p></div>{% endif %}
         <div class="form-field{% if field.name == 'first_name' or field.name == 'last_name' %} form-field-half{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>
       {% endfor %}
-      <button class="button button-dark button-full" type="submit">Create account &amp; register <span aria-hidden="true">↗</span></button>
+      <button class="button button-dark button-full" type="submit">Create account &amp; register <i class="bi bi-arrow-up-right" aria-hidden="true"></i></button>
       <p class="form-privacy">Your participant ID and Olympiad history are visible only after you log in.</p>
     </form>
   </div>
   <aside class="registration-aside">
-    <div class="registration-details-card"><span class="eyebrow">Your competition</span><h2>{{ season.name }}</h2><div class="registration-detail"><span class="detail-symbol" aria-hidden="true">✳</span><div><strong>Levels</strong><p>Pre-Ecolier to Student<br>Grades 1–12</p></div></div><div class="registration-detail"><span class="detail-symbol" aria-hidden="true">◷</span><div><strong>Registration deadline</strong><p>{% if season.registration_close_at %}{{ season.registration_close_at|date:"F j, Y" }}{% else %}To be announced{% endif %}</p></div></div><div class="registration-detail"><span class="detail-symbol" aria-hidden="true">◎</span><div><strong>Your login username</strong><p>Assigned after registration<br>Example: 2700001</p></div></div></div>
-    <div class="registration-help-card"><strong>Already have a participant ID?</strong><p>Log in first. Your previous profile details will be ready; enter this year's school and grade only.</p><a class="button button-outline button-small" href="{% url 'accounts:login' %}">Login to register <span aria-hidden="true">↗</span></a></div>
+    <div class="registration-details-card"><span class="eyebrow">Your competition</span><h2>{{ season.name }}</h2><div class="registration-detail"><i class="detail-symbol bi bi-mortarboard" aria-hidden="true"></i><div><strong>Levels</strong><p>Pre-Ecolier to Student<br>Grades 1–12</p></div></div><div class="registration-detail"><i class="detail-symbol bi bi-clock-history" aria-hidden="true"></i><div><strong>Registration deadline</strong><p>{% if season.registration_close_at %}{{ season.registration_close_at|date:"F j, Y" }}{% else %}To be announced{% endif %}</p></div></div><div class="registration-detail"><i class="detail-symbol bi bi-person-badge" aria-hidden="true"></i><div><strong>Your login username</strong><p>Assigned after registration<br>Example: 2700001</p></div></div></div>
+    <div class="registration-help-card"><strong>Already have a participant ID?</strong><p>Log in first. Your previous profile details will be ready; enter this year's school and grade only.</p><a class="button button-outline button-small" href="{% url 'accounts:login' %}">Login to register <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></div>
   </aside>
 </section>
 {% else %}
-<section class="section"><div class="empty-state"><span class="empty-mark" aria-hidden="true">◷</span><h2>Registration isn't open just yet</h2><p>Check announcements for this year's registration dates.</p><a class="button button-dark" href="{% url 'announcement-list' %}">View announcements <span aria-hidden="true">↗</span></a></div></section>
+<section class="section"><div class="empty-state"><i class="empty-mark bi bi-clock-history" aria-hidden="true"></i><h2>Registration isn't open just yet</h2><p>Check announcements for this year's registration dates.</p><a class="button button-dark" href="{% url 'announcement-list' %}">View announcements <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></div></section>
 {% endif %}
 {% endblock %}

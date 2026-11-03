@@ -258,7 +258,7 @@ class ContentWorkflowTests(TestCase):
         self.assertFalse(wrong_ratio.is_valid())
         self.assertIn("1200 × 630", str(wrong_ratio.errors))
         self.assertFalse(too_large.is_valid())
-        self.assertIn("smaller than 250 KB", str(too_large.errors))
+        self.assertIn("smaller than 300 KB", str(too_large.errors))
 
     def test_staff_groups_are_seeded_with_separated_draft_and_publish_rights(self):
         editor = Group.objects.get(name="Content Editor")
@@ -314,6 +314,11 @@ class HeroSlideManagementTests(TestCase):
         self.assertEqual(slide.created_by, self.staff)
         self.assertTrue(AuditLog.objects.filter(action="hero.published", object_id=str(slide.pk)).exists())
         self.assertContains(self.client.get(reverse("home")), slide.image.url)
+        self.assertTrue(slide.image.storage.exists(slide.image.name))
+        with override_settings(DEBUG=True):
+            image_response = self.client.get(slide.image.url)
+        self.assertEqual(image_response.status_code, 200)
+        self.assertEqual(image_response["Content-Type"], "image/jpeg")
 
         response = self.client.post(
             reverse("hero-slide-order", args=[slide.pk]),

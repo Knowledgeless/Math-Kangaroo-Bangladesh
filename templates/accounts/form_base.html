@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="auth-shell"><div class="auth-decoration"><span class="auth-shape auth-shape-one">+</span><span class="auth-shape auth-shape-two">✳</span><span class="auth-shape auth-shape-three">?</span><span class="eyebrow eyebrow-light">For the wonderfully curious</span><h2>Every big idea<br>starts with a question.</h2><p>Make space for new ways of thinking. Your Math Kangaroo journey starts here.</p></div><div class="auth-panel"><span class="eyebrow">{% block form_eyebrow %}Welcome{% endblock %}</span><h1>{% block form_title %}Let’s get started.{% endblock %}</h1><p class="auth-intro">{% block form_intro %}{% endblock %}</p>
+<section class="auth-shell"><div class="auth-decoration"><i class="auth-shape auth-shape-one bi bi-plus" aria-hidden="true"></i><i class="auth-shape auth-shape-two bi bi-stars" aria-hidden="true"></i><i class="auth-shape auth-shape-three bi bi-question-lg" aria-hidden="true"></i><span class="eyebrow eyebrow-light">For the wonderfully curious</span><h2>Every big idea<br>starts with a question.</h2><p>Make space for new ways of thinking. Your Math Kangaroo journey starts here.</p></div><div class="auth-panel"><span class="eyebrow">{% block form_eyebrow %}Welcome{% endblock %}</span><h1>{% block form_title %}Let’s get started.{% endblock %}</h1><p class="auth-intro">{% block form_intro %}{% endblock %}</p>
   {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
   {% block form_content %}{% endblock %}
 </div></section>

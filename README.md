@@ -31,6 +31,8 @@ DB_PORT=5432
 
 Password reset messages print to the development console. Set the SMTP environment variables and `DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend` to send real email.
 
+Uploaded media is served from `MEDIA_ROOT` at `MEDIA_URL` during local development. In production, configure the web server or media storage to serve `MEDIA_URL`; Django's development file server is disabled when `DJANGO_DEBUG=false`.
+
 Default staff Groups are synchronized after migrations: **Content Editor**, **Content Publisher**, **Competition Manager** and **Auditor**. Assign users to the least-privileged matching Group through `/admin/`; combine editor and publisher groups only for staff who have explicit publishing authority. The custom content desk lives at `/dashboard/content/`.
 
 ## Current product slice

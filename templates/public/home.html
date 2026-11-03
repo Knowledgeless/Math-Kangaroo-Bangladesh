@@ -15,9 +15,9 @@
     </div>
     {% if hero_slides|length > 1 %}
       <div class="hero-slider-controls" aria-label="Slider controls">
-        <button type="button" class="hero-slider-arrow" data-hero-previous aria-label="Previous image">←</button>
+        <button type="button" class="hero-slider-arrow" data-hero-previous aria-label="Previous image"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
         <span class="sr-only" data-hero-position aria-live="polite">1 of {{ hero_slides|length }}</span>
-        <button type="button" class="hero-slider-arrow" data-hero-next aria-label="Next image">→</button>
+        <button type="button" class="hero-slider-arrow" data-hero-next aria-label="Next image"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
       </div>
     {% endif %}
   </div>
@@ -27,11 +27,11 @@
         <form method="post" action="{% url 'hero-slide-create' %}" enctype="multipart/form-data" class="hero-cover-upload">
           {% csrf_token %}
           <input id="hero-image-upload" class="hero-file-input" type="file" name="image" accept="image/*" aria-label="Choose a cover photo">
-          <label for="hero-image-upload" class="hero-change-photo"><span aria-hidden="true">▧</span> Change cover photo</label>
+          <label for="hero-image-upload" class="hero-change-photo"><i class="bi bi-image" aria-hidden="true"></i> Change cover photo</label>
           <label class="sr-only" for="hero-new-order">Display order</label>
           <input id="hero-new-order" type="number" name="display_order" value="0" class="hero-cover-order" aria-label="Display order" placeholder="#">
           <button class="hero-cover-save" type="submit" aria-label="Save cover photo">Save</button>
-          <span class="hero-image-guidance">1200 × 630 · under 250 KB</span>
+          <span class="hero-image-guidance">1200 × 630 · under 300 KB</span>
         </form>
       {% endif %}
       {% if can_change_hero_slide and managed_hero_slides %}
@@ -42,8 +42,8 @@
               <img src="{{ slide.image.url }}" alt="">
               <label class="sr-only" for="hero-order-{{ slide.pk }}">Image {{ forloop.counter }} display order</label>
               <input id="hero-order-{{ slide.pk }}" type="number" name="display_order" value="{{ slide.display_order }}" aria-label="Display order" placeholder="#">
-              <button type="submit" aria-label="Save image order">↕</button>
-              <button type="submit" form="remove-hero-{{ slide.pk }}" class="hero-cover-remove" aria-label="Remove image">×</button>
+              <button type="submit" aria-label="Save image order"><i class="bi bi-arrow-down-up" aria-hidden="true"></i></button>
+              <button type="submit" form="remove-hero-{{ slide.pk }}" class="hero-cover-remove" aria-label="Remove image"><i class="bi bi-trash3" aria-hidden="true"></i></button>
             </form>
             <form id="remove-hero-{{ slide.pk }}" method="post" action="{% url 'hero-slide-remove' slide.pk %}" data-confirm="Remove this image from the homepage slider?">{% csrf_token %}</form>
           {% endfor %}
@@ -54,15 +54,15 @@
 </section>
 
 <section class="home-benefits" aria-label="The Math Kangaroo experience">
-  <article><span class="benefit-icon benefit-icon-yellow" aria-hidden="true">✳</span><div><strong>Think creatively</strong><p>Unexpected puzzles make room for fresh ideas.</p></div></article>
-  <article><span class="benefit-icon benefit-icon-coral" aria-hidden="true">◇</span><div><strong>Learn by exploring</strong><p>Discover the joy in trying a new approach.</p></div></article>
-  <article><span class="benefit-icon benefit-icon-lilac" aria-hidden="true">◎</span><div><strong>Every grade belongs</strong><p>Thoughtful challenges for students in grades 1–12.</p></div></article>
-  <article><span class="benefit-icon benefit-icon-green" aria-hidden="true">↗</span><div><strong>Celebrate your journey</strong><p>Keep your yearly participation in one student profile.</p></div></article>
+  <article><i class="benefit-icon benefit-icon-yellow bi bi-lightbulb" aria-hidden="true"></i><div><strong>Think creatively</strong><p>Unexpected puzzles make room for fresh ideas.</p></div></article>
+  <article><i class="benefit-icon benefit-icon-coral bi bi-compass" aria-hidden="true"></i><div><strong>Learn by exploring</strong><p>Discover the joy in trying a new approach.</p></div></article>
+  <article><i class="benefit-icon benefit-icon-lilac bi bi-mortarboard" aria-hidden="true"></i><div><strong>Every grade belongs</strong><p>Thoughtful challenges for students in grades 1–12.</p></div></article>
+  <article><i class="benefit-icon benefit-icon-green bi bi-trophy" aria-hidden="true"></i><div><strong>Celebrate your journey</strong><p>Keep your yearly participation in one student profile.</p></div></article>
 </section>
 
-<section class="why-section home-about"><div class="why-illustration" aria-hidden="true"><span class="why-circle">Math<br>is an<br>adventure</span><i class="shape-dot"></i><i class="shape-star">✳</i><i class="shape-cross">+</i></div><div class="why-copy"><span class="eyebrow eyebrow-light">A different kind of math contest</span><h2>More than right answers. <span class="text-green">A way to think.</span></h2><p>Math Kangaroo invites students to look closer, connect ideas and enjoy the moment a tricky problem begins to make sense. The challenge is designed to reward curiosity—not just speed.</p><div class="why-points"><div><span>✳</span><p><strong>For every learner</strong><br>Age-appropriate levels for grades 1–12.</p></div><div><span>✳</span><p><strong>Ideas over memorization</strong><br>Explore logic, patterns and creative reasoning.</p></div></div></div></section>
+<section class="why-section home-about"><div class="why-illustration" aria-hidden="true"><span class="why-circle">Math<br>is an<br>adventure</span><i class="shape-dot"></i><i class="shape-star bi bi-stars"></i><i class="shape-cross bi bi-plus"></i></div><div class="why-copy"><span class="eyebrow eyebrow-light">A different kind of math contest</span><h2>More than right answers. <span class="text-green">A way to think.</span></h2><p>Math Kangaroo invites students to look closer, connect ideas and enjoy the moment a tricky problem begins to make sense. The challenge is designed to reward curiosity—not just speed.</p><div class="why-points"><div><i class="bi bi-lightbulb" aria-hidden="true"></i><p><strong>For every learner</strong><br>Age-appropriate levels for grades 1–12.</p></div><div><i class="bi bi-puzzle" aria-hidden="true"></i><p><strong>Ideas over memorization</strong><br>Explore logic, patterns and creative reasoning.</p></div></div></div></section>
 
-<section class="home-next section"><div class="home-next-copy"><span class="eyebrow">{% if current_season %}{{ current_season.year }} Olympiad{% else %}Your next step{% endif %}</span><h2>{% if current_season %}A new year of big ideas is waiting.{% else %}Ready for a joyful challenge?{% endif %}</h2><p>{% if current_season and current_season.is_registration_open %}Registration is open. Create your student account and get your participant username.{% elif current_season %}Explore the syllabus and follow announcements for {{ current_season.year }} updates.{% else %}Explore the syllabus, discover practice resources and watch for registration announcements.{% endif %}</p><div class="hero-actions">{% if current_season and current_season.is_registration_open %}<a class="button button-dark" href="{% if user.is_authenticated %}{% url 'accounts:dashboard' %}{% else %}{% url 'accounts:signup' %}{% endif %}">{% if user.is_authenticated %}Go to my dashboard{% else %}Register for {{ current_season.year }}{% endif %} <span aria-hidden="true">↗</span></a>{% endif %}<a class="button button-outline" href="{% url 'announcement-list' %}">Latest announcements</a></div></div><div class="home-next-art" aria-hidden="true"><span>∑</span><i>?</i><b>✳</b></div></section>
+<section class="home-next section"><div class="home-next-copy"><span class="eyebrow">{% if current_season %}{{ current_season.year }} Olympiad{% else %}Your next step{% endif %}</span><h2>{% if current_season %}A new year of big ideas is waiting.{% else %}Ready for a joyful challenge?{% endif %}</h2><p>{% if current_season and current_season.is_registration_open %}Registration is open. Create your student account and get your participant username.{% elif current_season %}Explore the syllabus and follow announcements for {{ current_season.year }} updates.{% else %}Explore the syllabus, discover practice resources and watch for registration announcements.{% endif %}</p><div class="hero-actions">{% if current_season and current_season.is_registration_open %}<a class="button button-dark" href="{% if user.is_authenticated %}{% url 'accounts:dashboard' %}{% else %}{% url 'accounts:signup' %}{% endif %}">{% if user.is_authenticated %}Go to my dashboard{% else %}Register for {{ current_season.year }}{% endif %} <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>{% endif %}<a class="button button-outline" href="{% url 'announcement-list' %}">Latest announcements</a></div></div><div class="home-next-art" aria-hidden="true"><span>∑</span><i class="bi bi-question-lg"></i><b class="bi bi-stars"></b></div></section>
 
-{% if announcements %}<section class="section home-news"><div class="section-heading"><div><span class="eyebrow">From the organizers</span><h2>What's <span class="text-green">happening.</span></h2></div><a class="text-link" href="{% url 'announcement-list' %}">All announcements <span aria-hidden="true">↗</span></a></div><div class="news-grid">{% for announcement in announcements %}<article class="news-card"><div class="news-card-art news-tone-{{ forloop.counter }}"><span aria-hidden="true">{% if forloop.counter == 1 %}✳{% elif forloop.counter == 2 %}∑{% else %}◇{% endif %}</span><span class="category-pill">{{ announcement.get_category_display }}</span></div><div class="news-card-copy"><span class="news-date">{% if announcement.published_at %}{{ announcement.published_at|date:"F j, Y" }}{% else %}Latest update{% endif %}</span><h3>{{ announcement.title }}</h3><p>{{ announcement.summary }}</p><a class="text-link" href="{{ announcement.get_absolute_url }}">Read announcement <span aria-hidden="true">↗</span></a></div></article>{% endfor %}</div></section>{% endif %}
+{% if announcements %}<section class="section home-news"><div class="section-heading"><div><span class="eyebrow">From the organizers</span><h2>What's <span class="text-green">happening.</span></h2></div><a class="text-link" href="{% url 'announcement-list' %}">All announcements <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></div><div class="news-grid">{% for announcement in announcements %}<article class="news-card"><div class="news-card-art news-tone-{{ forloop.counter }}"><span aria-hidden="true">{% if forloop.counter == 1 %}<span class="bi bi-stars"></span>{% elif forloop.counter == 2 %}∑{% else %}<span class="bi bi-lightbulb"></span>{% endif %}</span><span class="category-pill">{{ announcement.get_category_display }}</span></div><div class="news-card-copy"><span class="news-date">{% if announcement.published_at %}{{ announcement.published_at|date:"F j, Y" }}{% else %}Latest update{% endif %}</span><h3>{{ announcement.title }}</h3><p>{{ announcement.summary }}</p><a class="text-link" href="{{ announcement.get_absolute_url }}">Read announcement <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></div></article>{% endfor %}</div></section>{% endif %}
 {% endblock %}

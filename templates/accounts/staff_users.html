@@ -5,12 +5,12 @@
 <section class="cms-shell">
   <div class="dashboard-heading">
     <div>
-      <a class="back-link" href="{% url 'accounts:dashboard' %}">← Your dashboard</a>
+      <a class="back-link" href="{% url 'accounts:dashboard' %}"><i class="bi bi-chevron-left" aria-hidden="true"></i> Your dashboard</a>
       <span class="eyebrow">Staff workspace</span>
       <h1>People & participation.</h1>
       <p>Find accounts by name, username, email, phone or institute, then review and update user details.</p>
     </div>
-    <span class="dashboard-avatar cms-avatar" aria-hidden="true">◎</span>
+    <i class="dashboard-avatar cms-avatar bi bi-people" aria-hidden="true"></i>
   </div>
 
   <div class="user-stat-grid" aria-label="User registration statistics">
@@ -23,8 +23,8 @@
   </div>
 
   <form method="get" class="filter-bar user-search-bar" role="search" data-live-search>
-    <label class="search-field"><span class="sr-only">Search users</span><span aria-hidden="true">⌕</span><input type="search" name="q" value="{{ search }}" placeholder="Name, username, email, phone or institute"></label>
-    <button class="button button-icon button-small" type="submit" aria-label="Search users" title="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg></button>
+    <label class="search-field"><span class="sr-only">Search users</span><i class="bi bi-search" aria-hidden="true"></i><input type="search" name="q" value="{{ search }}" placeholder="Name, username, email, phone or institute"></label>
+    <button class="button button-icon button-small" type="submit" aria-label="Search users" title="Search"><i class="bi bi-search" aria-hidden="true"></i></button>
     {% if search %}<a class="button button-outline button-small" href="{% url 'accounts:staff-users' %}">Clear</a>{% endif %}
   </form>
 
@@ -46,15 +46,15 @@
             <tr>
               <td><a href="{% url 'accounts:staff-user-edit' account.pk %}" aria-label="Edit {{ account.get_full_name|default:account.username }}" title="Edit user"><small>@{{ account.username }}</small></a></td>
               <td><strong>{{ account.get_full_name|default:account.username }}</strong></td>
-              <td>{{ account.email|default:"No email" }}{% if account.student_profile.phone %} | {{ account.student_profile.phone }}{% endif %}</td>
+              <td>{{ account.email|default:"No email" }}{% if account.student_profile.phone %} | {{ account.student_profile.phone }}{% endif %}{% with latest_registration=account.competition_registrations.all|first %}{% if latest_registration %}<small>{{ latest_registration.school_name }}</small>{% endif %}{% endwith %}</td>
               {% comment %} <td>{% with latest_registration=account.competition_registrations.all|first %}{% if latest_registration %}<strong>{{ latest_registration.school_name }}</strong><small>{{ latest_registration.season.year }} · Grade {{ latest_registration.grade }}</small>{% else %}—{% endif %}{% endwith %}</td> 
               <td><span class="status-pill">{% if account.is_superuser %}Superuser{% elif account.is_staff %}Staff{% else %}{{ account.get_role_display }}{% endif %}</span><small class="{% if account.is_active %}account-active{% else %}account-inactive{% endif %}">{% if account.is_active %}Active{% else %}Inactive{% endif %}</small></td>{% endcomment %}
               
               <td class="table-actions user-actions">
                 {% if account.is_superuser and not request.user.is_superuser %}<span>Protected</span>{% else %}
-                  {% if perms.accounts.change_user %}<a class="action-icon" href="{% url 'accounts:staff-user-edit' account.pk %}" aria-label="Edit {{ account.get_full_name|default:account.username }}" title="Edit user"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l4.3-.9L19 8.4a2.1 2.1 0 0 0-3-3L5.3 16.1 4 20Z"></path></svg></a>{% endif %}
+                  {% if perms.accounts.change_user %}<a class="action-icon" href="{% url 'accounts:staff-user-edit' account.pk %}" aria-label="Edit {{ account.get_full_name|default:account.username }}" title="Edit user"><i class="bi bi-pencil" aria-hidden="true"></i></a>{% endif %}
                   {% if perms.accounts.delete_user and account.is_active and account.pk != request.user.pk and not account.is_superuser %}
-                    <form method="post" action="{% url 'accounts:staff-user-deactivate' account.pk %}" data-confirm="Deactivate this account? Access will be removed, but competition and audit history will be kept.">{% csrf_token %}<button class="action-icon action-icon-danger" type="submit" aria-label="Deactivate {{ account.get_full_name|default:account.username }}" title="Deactivate user"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M18 8v7m-3.5-3.5h7"></path></svg></button></form>
+                    <form method="post" action="{% url 'accounts:staff-user-deactivate' account.pk %}" data-confirm="Deactivate this account? Access will be removed, but competition and audit history will be kept.">{% csrf_token %}<button class="action-icon action-icon-danger" type="submit" aria-label="Deactivate {{ account.get_full_name|default:account.username }}" title="Deactivate user"><i class="bi bi-person-dash" aria-hidden="true"></i></button></form>
                   {% endif %}
                 {% endif %}
               </td>
@@ -70,9 +70,9 @@
     </div>
     {% if page_obj.has_other_pages %}
       <nav class="pagination" aria-label="User management pages">
-        {% if page_obj.has_previous %}<a href="?q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}">← Previous</a>{% endif %}
+        {% if page_obj.has_previous %}<a href="?q={{ search|urlencode }}&page={{ page_obj.previous_page_number }}"><i class="bi bi-chevron-left" aria-hidden="true"></i> Previous</a>{% endif %}
         <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}<a href="?q={{ search|urlencode }}&page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+        {% if page_obj.has_next %}<a href="?q={{ search|urlencode }}&page={{ page_obj.next_page_number }}">Next <i class="bi bi-chevron-right" aria-hidden="true"></i></a>{% endif %}
       </nav>
     {% endif %}
     <p class="user-history-note">Deactivating an account blocks sign-in while preserving registration and audit history.</p>

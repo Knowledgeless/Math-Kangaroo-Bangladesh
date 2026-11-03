@@ -25,7 +25,7 @@ class SiteSettings(models.Model):
 
 
 class HeroSlide(models.Model):
-    MAX_IMAGE_SIZE = 250 * 1024
+    MAX_IMAGE_SIZE = 300 * 1024
 
     title = models.CharField(max_length=180)
     subtitle = models.CharField(max_length=280, blank=True)

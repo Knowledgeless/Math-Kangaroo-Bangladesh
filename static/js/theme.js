@@ -7,7 +7,7 @@
       button.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} theme`);
       button.setAttribute("aria-pressed", String(theme === "dark"));
       const icon = button.querySelector(".theme-icon");
-      if (icon) icon.textContent = theme === "dark" ? "☼" : "◐";
+      if (icon) icon.className = `theme-icon bi ${theme === "dark" ? "bi-sun" : "bi-moon-stars"}`;
     });
   };
 

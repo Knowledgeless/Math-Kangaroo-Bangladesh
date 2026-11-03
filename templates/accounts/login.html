@@ -7,6 +7,6 @@
 {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
 <form method="post" class="form-stack" novalidate>{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
   {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}
-  <button class="button button-dark button-full" type="submit">Login <span aria-hidden="true">↗</span></button>
+  <button class="button button-dark button-full" type="submit">Login <i class="bi bi-arrow-up-right" aria-hidden="true"></i></button>
 </form><a class="auth-small-link" href="{% url 'accounts:password_reset' %}">Forgot your password? Reset with your registration email.</a><p class="auth-switch">New participant? <a href="{% url 'accounts:signup' %}">Register for this year's Olympiad</a></p>
 {% endblock %}

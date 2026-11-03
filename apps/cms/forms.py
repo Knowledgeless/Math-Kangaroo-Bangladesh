@@ -45,14 +45,14 @@ class FAQForm(StyledModelForm):
 class HeroSlideImageField(forms.ImageField):
     def to_python(self, value):
         if value and value.size >= HeroSlide.MAX_IMAGE_SIZE:
-            raise forms.ValidationError("Choose an image smaller than 250 KB.")
+            raise forms.ValidationError("Choose an image smaller than 300 KB.")
         return super().to_python(value)
 
 
 class HeroSlideForm(StyledModelForm):
     image = HeroSlideImageField(
         label="Slider image",
-        help_text="Use a 1200 × 630 image smaller than 250 KB.",
+        help_text="Use a 1200 × 630 image smaller than 300 KB.",
     )
     display_order = forms.IntegerField(min_value=0, max_value=65535, initial=0)
 
