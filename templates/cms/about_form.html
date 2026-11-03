@@ -1,0 +1,65 @@
+{% extends "staff_base.html" %}
+{% block title %}Manage About page — Content desk{% endblock %}
+{% block staff_page_label %}About page{% endblock %}
+{% block staff_content %}
+<section class="cms-form-shell about-edit-shell">
+  <a class="back-link" href="{% url 'cms-dashboard' %}"><i class="bi bi-chevron-left" aria-hidden="true"></i> Content desk</a>
+  <div class="form-page-heading">
+    <span class="eyebrow">Public information</span>
+    <h1>Tell your story.</h1>
+    <p>Shape the About page, then use the editor to format your story just like a document.</p>
+  </div>
+  <form method="post" class="cms-form about-edit-form" data-rich-text-form>
+    {% csrf_token %}
+    {% for field in form %}
+      {% if field.name != "content" %}
+        <div class="form-field field-full">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="about-editor-field field-full">
+      <label id="about-content-label" for="about-content-editor">Your story</label>
+      <p class="field-help">Add paragraphs, headings, lists, and links. Formatting is cleaned when saved.</p>
+      <div class="about-editor" data-rich-text-editor>
+        <div class="rich-text-toolbar" role="toolbar" aria-label="Story formatting" data-rich-toolbar hidden>
+          <select aria-label="Paragraph style" data-editor-format>
+            <option value="p">Paragraph</option>
+            <option value="h2">Heading</option>
+            <option value="h3">Subheading</option>
+            <option value="blockquote">Quote</option>
+          </select>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button type="button" data-editor-command="bold" aria-label="Bold" title="Bold"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
+          <button type="button" data-editor-command="italic" aria-label="Italic" title="Italic"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
+          <button type="button" data-editor-command="underline" aria-label="Underline" title="Underline"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
+          <select aria-label="Font size" data-editor-size>
+            <option value="">Size</option>
+            <option value="small">Small</option>
+            <option value="normal">Normal</option>
+            <option value="large">Large</option>
+            <option value="xlarge">Extra large</option>
+          </select>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button type="button" data-editor-command="insertUnorderedList" aria-label="Bulleted list" title="Bulleted list"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
+          <button type="button" data-editor-command="insertOrderedList" aria-label="Numbered list" title="Numbered list"><i class="bi bi-list-ol" aria-hidden="true"></i></button>
+          <button type="button" data-editor-link aria-label="Insert link" title="Insert link"><i class="bi bi-link-45deg" aria-hidden="true"></i></button>
+          <button type="button" data-editor-command="removeFormat" aria-label="Clear formatting" title="Clear formatting"><i class="bi bi-eraser" aria-hidden="true"></i></button>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button type="button" data-editor-command="undo" aria-label="Undo" title="Undo"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+          <button type="button" data-editor-command="redo" aria-label="Redo" title="Redo"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+        </div>
+        <div id="about-content-editor" class="rich-text-canvas" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="about-content-label" data-editor-canvas hidden></div>
+        {{ form.content }}
+      </div>
+      {% for error in form.content.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      {% if form.content.help_text %}<div class="field-help">{{ form.content.help_text }}</div>{% endif %}
+    </div>
+    <div class="form-actions"><button class="button button-dark" type="submit">Save About page</button></div>
+  </form>
+</section>
+{% endblock %}

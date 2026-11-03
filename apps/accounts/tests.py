@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.audit.models import AuditLog
 from apps.cms.views import home
 from apps.competitions.models import CompetitionRegistration, CompetitionSeason
+from .forms import StudentSignupForm
 from .models import StudentProfile
 
 User = get_user_model()
@@ -17,6 +18,13 @@ STRONG_PASSWORD = "Sensible-student-pass-849!"
 
 
 class AccountFlowTests(TestCase):
+    def test_birthdate_uses_the_branded_calendar_widget(self):
+        date_input = str(StudentSignupForm()["date_of_birth"])
+
+        self.assertIn('type="text"', date_input)
+        self.assertIn('data-custom-date-picker="true"', date_input)
+        self.assertIn('placeholder="YYYY-MM-DD"', date_input)
+
     def test_all_message_levels_render_with_their_toast_types(self):
         request = RequestFactory().get("/")
         request.user = AnonymousUser()

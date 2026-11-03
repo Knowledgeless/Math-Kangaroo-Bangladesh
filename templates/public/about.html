@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ about_document_title }}{% endblock %}
+{% block content %}
+{% if about_title or about_introduction %}
+<section class="about-hero">
+  <div class="about-hero-inner">
+    <div class="about-hero-copy">
+      {% if about_title %}<h1>{{ about_title }}</h1>{% endif %}
+      {% if about_introduction %}<p>{{ about_introduction }}</p>{% endif %}
+    </div>
+    <div class="about-hero-art" aria-hidden="true">
+      <img src="{% static 'images/homepage-hero-classroom.jpg' %}" alt="">
+    </div>
+  </div>
+</section>
+{% elif about_lead_html %}
+<section class="about-hero">
+  <div class="about-hero-inner about-hero-inner-lead">
+    <div class="about-hero-copy about-copy about-hero-rich-copy">{{ about_lead_html|safe }}</div>
+    <div class="about-hero-art" aria-hidden="true">
+      <img src="{% static 'images/homepage-hero-classroom.jpg' %}" alt="">
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if about_content_html %}
+<section class="about-story-section">
+  <div class="about-copy">{{ about_content_html|safe }}</div>
+</section>
+{% endif %}
+{% endblock %}

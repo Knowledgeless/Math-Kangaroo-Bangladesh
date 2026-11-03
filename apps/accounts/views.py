@@ -145,6 +145,12 @@ def dashboard(request):
                     "cms.view_faq",
                     "cms.add_faq",
                     "cms.view_heroslide",
+                    "cms.manage_aboutpage",
+                    "cms.add_questionpaper",
+                    "cms.change_questionpaper",
+                    "competitions.view_syllabus",
+                    "competitions.add_syllabus",
+                    "competitions.change_syllabus",
                 )
             ),
             "can_manage_users": can_manage_users,
@@ -291,6 +297,12 @@ def _staff_dashboard_context(request):
             "cms.change_announcement",
             "cms.view_faq",
             "cms.view_heroslide",
+            "cms.manage_aboutpage",
+            "cms.add_questionpaper",
+            "cms.change_questionpaper",
+            "competitions.view_syllabus",
+            "competitions.add_syllabus",
+            "competitions.change_syllabus",
         )
     )
     return {

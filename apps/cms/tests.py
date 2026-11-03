@@ -16,9 +16,19 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.audit.models import AuditLog
+from apps.competitions.models import CompetitionDivision, CompetitionLevel, CompetitionSeason, Syllabus
 from .admin import AnnouncementAdmin
-from .forms import HeroSlideForm
-from .models import Announcement, FAQ, FAQCategory, HeroSlide, PublicationStatus, PublicResource
+from .forms import AboutPageForm, HeroSlideForm, QuestionPaperForm
+from .models import (
+    AboutPage,
+    Announcement,
+    FAQ,
+    FAQCategory,
+    HeroSlide,
+    PublicationStatus,
+    PublicResource,
+    QuestionPaper,
+)
 
 User = get_user_model()
 
@@ -112,6 +122,141 @@ class PublicContentTests(TestCase):
         with self.assertRaises(ValidationError) as error:
             announcement.full_clean()
         self.assertIn("cover_image_alt_text", error.exception.message_dict)
+
+    def test_about_page_uses_managed_content_when_available(self):
+        response = self.client.get(reverse("about"))
+        self.assertEqual(response.context["about_title"], "")
+        self.assertEqual(response.context["about_introduction"], "")
+        self.assertEqual(response.context["about_document_title"], "")
+        self.assertNotContains(response, "A joyful mathematics challenge for curious students.")
+
+        AboutPage.objects.create(
+            pk=1,
+            title="Our journey",
+            introduction="Learning through joyful challenges.",
+            content="We bring creative mathematics to students.\n\nEvery grade can join.",
+        )
+        response = self.client.get(reverse("about"))
+        self.assertContains(response, "Our journey")
+        self.assertContains(response, "Every grade can join.")
+
+    def test_about_page_uses_saved_copy_without_invented_layout_text(self):
+        AboutPage.objects.create(
+            pk=1,
+            content=(
+                "What is Math Kangaroo?\n"
+                "The world’s largest international mathematics competition.\n\n"
+                "History & Origins\n"
+                "The story began with a creative idea."
+            ),
+        )
+
+        response = self.client.get(reverse("about"))
+
+        self.assertContains(response, "<h2>What is Math Kangaroo?</h2>")
+        self.assertEqual(response.context["about_document_title"], "What is Math Kangaroo?")
+        self.assertContains(response, "The world’s largest international mathematics competition.")
+        self.assertContains(response, "<h2>History &amp; Origins</h2>")
+        self.assertContains(response, "The story began with a creative idea.")
+        self.assertNotContains(response, "Curiosity first")
+        self.assertNotContains(response, "From “what if?” to “I got it!”")
+
+    def test_about_page_rich_content_is_sanitized_and_preserves_formatting(self):
+        AboutPage.objects.create(
+            pk=1,
+            content=(
+                '<h2>A <strong>bold</strong> idea</h2>'
+                '<p><a href="javascript:alert(1)" onclick="alert(1)">Curiosity</a>'
+                '<script>alert("unsafe")</script></p>'
+                '<p><span data-text-size="large" style="color:red">Think big.</span></p>'
+            ),
+        )
+
+        response = self.client.get(reverse("about"))
+
+        self.assertContains(response, "<h2>A <strong>bold</strong> idea</h2>")
+        self.assertContains(response, "<a>Curiosity</a>")
+        self.assertContains(response, '<span data-text-size="large">Think big.</span>')
+        self.assertNotContains(response, "javascript:")
+        self.assertNotContains(response, "onclick")
+        self.assertNotContains(response, "<script>")
+
+    def test_about_form_sanitizes_content_and_formats_legacy_plain_text(self):
+        form = AboutPageForm(
+            {
+                "title": "Our story",
+                "introduction": "A challenge for curious learners.",
+                "content": '<p><em>Creative thinking</em><b> and bold</b></p><img src=x onerror=alert(1)>',
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            form.cleaned_data["content"],
+            "<p><em>Creative thinking</em><strong> and bold</strong></p>",
+        )
+
+        about = AboutPage.objects.create(content="First paragraph.\n\nSecond paragraph.")
+        edit_form = AboutPageForm(instance=about)
+        self.assertEqual(
+            edit_form.initial["content"],
+            "<p>First paragraph.</p><p>Second paragraph.</p>",
+        )
+
+    def test_question_papers_filter_and_download_only_published_pdfs(self):
+        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+            older = QuestionPaper.objects.create(
+                title="2025 Ecolier Questions",
+                year=2025,
+                category="Ecolier",
+                pdf_file=SimpleUploadedFile("ecolier-2025.pdf", b"%PDF-1.4\nolder"),
+                status=PublicationStatus.PUBLISHED,
+            )
+            latest = QuestionPaper.objects.create(
+                title="2026 Ecolier Questions",
+                year=2026,
+                category="Ecolier",
+                pdf_file=SimpleUploadedFile("ecolier-2026.pdf", b"%PDF-1.4\nlatest"),
+                status=PublicationStatus.PUBLISHED,
+            )
+            draft = QuestionPaper.objects.create(
+                title="Private 2026 Benjamin Questions",
+                year=2026,
+                category="Benjamin",
+                pdf_file=SimpleUploadedFile("private.pdf", b"%PDF-1.4\nprivate"),
+            )
+            response = self.client.get(reverse("questions"), {"year": "2026", "category": "Ecolier"})
+            self.assertContains(response, latest.title)
+            self.assertNotContains(response, older.title)
+            self.assertNotContains(response, draft.title)
+
+            download = self.client.get(reverse("question-paper-download", args=[latest.pk]))
+            self.assertEqual(download["Content-Type"], "application/pdf")
+            self.assertIn("attachment", download["Content-Disposition"])
+            self.assertEqual(b"".join(download.streaming_content), b"%PDF-1.4\nlatest")
+            self.assertEqual(
+                self.client.get(reverse("question-paper-download", args=[draft.pk])).status_code,
+                404,
+            )
+
+    def test_question_paper_upload_requires_pdf_content_and_enforces_size(self):
+        valid = QuestionPaperForm(
+            {"title": "Sample", "year": 2026, "category": "Ecolier"},
+            {"pdf_file": SimpleUploadedFile("sample.pdf", b"%PDF-1.4\ncontents")},
+        )
+        invalid_content = QuestionPaperForm(
+            {"title": "Not a PDF", "year": 2026, "category": "Ecolier"},
+            {"pdf_file": SimpleUploadedFile("not-a-pdf.pdf", b"not a pdf")},
+        )
+        oversized = QuestionPaperForm(
+            {"title": "Too large", "year": 2026, "category": "Ecolier"},
+            {"pdf_file": SimpleUploadedFile("large.pdf", b"%PDF-" + b"x" * QuestionPaper.MAX_FILE_SIZE)},
+        )
+        self.assertTrue(valid.is_valid(), valid.errors)
+        self.assertFalse(invalid_content.is_valid())
+        self.assertIn("valid PDF", str(invalid_content.errors))
+        self.assertFalse(oversized.is_valid())
+        self.assertIn("20 MB", str(oversized.errors))
 
 
 class ContentWorkflowTests(TestCase):
@@ -279,6 +424,134 @@ class ContentWorkflowTests(TestCase):
         self.assertNotContains(response, "Homepage hero")
         self.assertNotContains(response, "Add a hero slide")
         self.assertFalse(admin.site.is_registered(HeroSlide))
+
+
+class NewContentManagementTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="contentmgr", password="test-pass-12345")
+        permission_codenames = (
+            "view_announcement",
+            "manage_aboutpage",
+            "add_questionpaper",
+            "change_questionpaper",
+            "publish_questionpaper",
+            "view_questionpaper",
+            "view_syllabus",
+            "add_syllabus",
+            "change_syllabus",
+            "publish_syllabus",
+        )
+        self.user.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label__in=("cms", "competitions"),
+                codename__in=permission_codenames,
+            )
+        )
+
+    def test_about_page_can_be_updated_from_the_content_desk(self):
+        self.client.force_login(self.user)
+        dashboard = self.client.get(reverse("cms-dashboard"))
+        self.assertContains(dashboard, "Manage About page")
+
+        response = self.client.post(
+            reverse("cms-about-edit"),
+            {
+                "title": "Our Math Kangaroo story",
+                "introduction": "A challenge for curious learners.",
+                "content": "We make room for creative thinking.",
+            },
+        )
+        self.assertRedirects(response, reverse("cms-dashboard"))
+        self.assertContains(self.client.get(reverse("about")), "Our Math Kangaroo story")
+
+    def test_about_page_rich_content_can_be_saved_and_rendered(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("cms-about-edit"),
+            {
+                "title": "Our story",
+                "introduction": "For curious learners.",
+                "content": (
+                    '<h2>A <strong>joyful</strong> challenge</h2>'
+                    '<p><span data-text-size="xlarge">Think boldly.</span> '
+                    '<a href="javascript:alert(1)">Explore</a>'
+                    '<script>alert("unsafe")</script></p>'
+                ),
+            },
+        )
+
+        self.assertRedirects(response, reverse("cms-dashboard"))
+        page = self.client.get(reverse("about"))
+        self.assertContains(page, "<h2>A <strong>joyful</strong> challenge</h2>")
+        self.assertContains(page, '<span data-text-size="xlarge">Think boldly.</span>')
+        self.assertContains(page, "<a>Explore</a>")
+        self.assertNotContains(page, "javascript:")
+        self.assertNotContains(page, "<script>")
+
+    def test_question_pdf_can_be_uploaded_and_published_from_the_content_desk(self):
+        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+            self.client.force_login(self.user)
+            response = self.client.post(
+                reverse("cms-question-paper-create"),
+                {
+                    "title": "2026 Ecolier challenge",
+                    "description": "Released practice questions",
+                    "year": "2026",
+                    "category": "Ecolier",
+                    "pdf_file": SimpleUploadedFile("ecolier-2026.pdf", b"%PDF-1.4\nquestions"),
+                    "action": "publish",
+                },
+            )
+            self.assertRedirects(response, reverse("cms-dashboard"))
+            paper = QuestionPaper.objects.get(title="2026 Ecolier challenge")
+            self.assertEqual(paper.status, PublicationStatus.PUBLISHED)
+            self.assertContains(self.client.get(reverse("questions")), paper.title)
+            self.assertTrue(
+                AuditLog.objects.filter(action="question_paper.published", object_id=str(paper.pk)).exists()
+            )
+
+    def test_syllabus_and_topics_can_be_created_from_the_content_desk(self):
+        season = CompetitionSeason.objects.create(name="2026 Olympiad", year=2026, slug="2026")
+        level = CompetitionLevel.objects.create(
+            name="CMS Test Ecolier",
+            code="ecolier-test",
+            min_grade=3,
+            max_grade=4,
+        )
+        division = CompetitionDivision.objects.create(season=season, level=level, grade=3)
+        self.client.force_login(self.user)
+        dashboard = self.client.get(reverse("cms-dashboard"))
+        self.assertContains(dashboard, "Syllabus management")
+
+        response = self.client.post(
+            reverse("cms-syllabus-create"),
+            {
+                "division": division.pk,
+                "title": "Grade 3 mathematics",
+                "description": "Ideas for grade three.",
+                "topics-TOTAL_FORMS": "1",
+                "topics-INITIAL_FORMS": "0",
+                "topics-MIN_NUM_FORMS": "0",
+                "topics-MAX_NUM_FORMS": "1000",
+                "topics-0-id": "",
+                "topics-0-topic": "Patterns",
+                "topics-0-description": "Explore repeating patterns.",
+                "topics-0-display_order": "1",
+                "action": "publish",
+            },
+        )
+        self.assertRedirects(response, reverse("cms-dashboard"))
+        syllabus = Syllabus.objects.get(division=division)
+        self.assertEqual(syllabus.status, Syllabus.Status.PUBLISHED)
+        self.assertEqual(syllabus.topics.get().topic, "Patterns")
+        self.assertContains(self.client.get(reverse("syllabus")), "Grade 3 mathematics")
+
+    def test_content_editor_group_includes_the_new_frontend_management_permissions(self):
+        editor = Group.objects.get(name="Content Editor")
+        editor_permissions = set(editor.permissions.values_list("codename", flat=True))
+        self.assertIn("manage_aboutpage", editor_permissions)
+        self.assertIn("add_questionpaper", editor_permissions)
+        self.assertIn("add_syllabus", editor_permissions)
 
 
 class HeroSlideManagementTests(TestCase):

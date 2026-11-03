@@ -127,6 +127,7 @@ class Syllabus(models.Model):
 
     class Meta:
         ordering = ["division__level__display_order", "division__grade"]
+        permissions = [("publish_syllabus", "Can publish syllabuses")]
 
     def __str__(self):
         return self.title

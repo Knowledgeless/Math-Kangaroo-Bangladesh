@@ -14,6 +14,12 @@ STAFF_GROUP_PERMISSIONS = {
             "publish_heroslide",
             "view_sitesettings", "change_sitesettings",
             "view_publicresource", "add_publicresource", "change_publicresource",
+            "view_aboutpage", "manage_aboutpage",
+            "view_questionpaper", "add_questionpaper", "change_questionpaper",
+        ),
+        "competitions": (
+            "view_syllabus", "add_syllabus", "change_syllabus",
+            "view_syllabustopic", "add_syllabustopic", "change_syllabustopic",
         ),
     },
     "Content Publisher": {
@@ -22,7 +28,9 @@ STAFF_GROUP_PERMISSIONS = {
             "view_faq", "publish_faq",
             "view_heroslide", "publish_heroslide",
             "view_publicresource", "publish_publicresource",
+            "view_questionpaper", "publish_questionpaper",
         ),
+        "competitions": ("view_syllabus", "publish_syllabus"),
     },
     "Competition Manager": {
         "competitions": (
@@ -32,6 +40,7 @@ STAFF_GROUP_PERMISSIONS = {
             "view_competitionregistration", "change_competitionregistration",
             "view_syllabus", "add_syllabus", "change_syllabus",
             "view_syllabustopic", "add_syllabustopic", "change_syllabustopic",
+            "publish_syllabus",
         ),
     },
     "Auditor": {

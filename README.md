@@ -43,6 +43,7 @@ Default staff Groups are synchronized after migrations: **Content Editor**, **Co
 - Profile changes are permitted only during the profile-edit window configured by staff/admin on the season.
 - Season, level, grade division, registration-sequence, annual-registration and versioned syllabus data models.
 - Staff-only content desk for hero slides, announcement drafts/publishing/archiving, and FAQ drafts/publishing.
+- Managed About page with a Word-like rich-text editor for headings, emphasis, font sizes, lists, and links.
 - Publication dates gate scheduled public content; drafts and archived material do not appear in public querysets.
 - Content publication and archive actions are recorded in an append-only audit log.
 - Responsive custom CSS following the supplied UI showcase layout while preserving the existing palette; accessible dashboard reminder and keyboard-operable syllabus-level tabs.

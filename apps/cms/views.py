@@ -1,16 +1,43 @@
+from html import unescape
+import re
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
+from django.http import FileResponse
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.html import strip_tags
 
 from apps.audit.models import AuditLog, record_event
 from apps.competitions.models import CompetitionLevel, CompetitionSeason, Syllabus
-from .forms import AnnouncementForm, FAQForm, HeroSlideForm, HeroSlideOrderForm, SiteSettingsForm
-from .models import Announcement, FAQ, FAQCategory, HeroSlide, PublicResource, PublicationStatus, SiteSettings
+from .forms import (
+    AboutPageForm,
+    AnnouncementForm,
+    FAQForm,
+    HeroSlideForm,
+    HeroSlideOrderForm,
+    QuestionPaperForm,
+    SiteSettingsForm,
+    SyllabusForm,
+    SyllabusTopicFormSet,
+)
+from .content_sanitizer import sanitize_about_content
+from .models import (
+    AboutPage,
+    Announcement,
+    FAQ,
+    FAQCategory,
+    HeroSlide,
+    PublicResource,
+    PublicationStatus,
+    QuestionPaper,
+    SiteSettings,
+)
 
 
 def home(request):
@@ -181,6 +208,42 @@ def faq_page(request):
     )
 
 
+def about_page(request):
+    about = AboutPage.objects.filter(pk=1).first()
+    title_default = AboutPage._meta.get_field("title").get_default()
+    introduction_default = AboutPage._meta.get_field("introduction").get_default()
+    about_title = about.title if about and about.title != title_default else ""
+    about_introduction = (
+        about.introduction
+        if about and about.introduction != introduction_default
+        else ""
+    )
+    content_html = sanitize_about_content(about.content) if about else ""
+    lead_match = (
+        re.match(r"(?s)(<h2>.*?</h2>.*?)(?=<h2>|$)", content_html)
+        if not (about_title or about_introduction)
+        else None
+    )
+    lead_html = lead_match.group(1).strip() if lead_match else ""
+    remaining_content_html = content_html[len(lead_match.group(1)):].strip() if lead_match else content_html
+    page_heading = re.search(r"<h2>(.*?)</h2>", lead_html or content_html)
+    document_title = about_title or (
+        unescape(strip_tags(page_heading.group(1))) if page_heading else ""
+    )
+    return render(
+        request,
+        "public/about.html",
+        {
+            "about": about,
+            "about_title": about_title,
+            "about_introduction": about_introduction,
+            "about_document_title": document_title,
+            "about_lead_html": lead_html,
+            "about_content_html": remaining_content_html,
+        },
+    )
+
+
 def syllabus_page(request):
     syllabuses = list(Syllabus.objects.filter(status=PublicationStatus.PUBLISHED).select_related(
         "division__level", "division__season"
@@ -204,6 +267,23 @@ def syllabus_page(request):
 
 
 def questions_page(request):
+    public_papers = QuestionPaper.objects.filter(status=PublicationStatus.PUBLISHED).filter(
+        Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())
+    )
+    available_years = list(public_papers.order_by("-year").values_list("year", flat=True).distinct())
+    available_categories = list(
+        public_papers.order_by("category").values_list("category", flat=True).distinct()
+    )
+    selected_year = request.GET.get("year", "")
+    selected_category = request.GET.get("category", "")
+    if selected_year.isdigit() and int(selected_year) in available_years:
+        public_papers = public_papers.filter(year=int(selected_year))
+    else:
+        selected_year = ""
+    if selected_category in available_categories:
+        public_papers = public_papers.filter(category=selected_category)
+    else:
+        selected_category = ""
     resources = PublicResource.objects.filter(status=PublicationStatus.PUBLISHED).filter(
         Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())
     )
@@ -214,38 +294,230 @@ def questions_page(request):
     return render(
         request,
         "public/questions.html",
-        {"resources": resources, "resource_groups": resource_groups},
+        {
+            "resources": resources,
+            "resource_groups": resource_groups,
+            "question_papers": public_papers,
+            "paper_years": available_years,
+            "paper_categories": available_categories,
+            "selected_year": selected_year,
+            "selected_category": selected_category,
+        },
     )
 
 
 @login_required
-@permission_required("cms.view_announcement", raise_exception=True)
 def content_dashboard(request):
+    if not (
+        request.user.has_perm("cms.view_announcement")
+        or request.user.has_perm("competitions.view_syllabus")
+    ):
+        raise PermissionDenied
     search = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "")
-    announcements = Announcement.objects.all()
-    faqs = FAQ.objects.select_related("category")
+    can_view_content = request.user.has_perm("cms.view_announcement")
+    can_view_syllabuses = request.user.has_perm("competitions.view_syllabus")
+    announcements = Announcement.objects.all() if can_view_content else Announcement.objects.none()
+    faqs = FAQ.objects.select_related("category") if can_view_content else FAQ.objects.none()
+    syllabuses = (
+        Syllabus.objects.select_related("division__season", "division__level").prefetch_related("topics")
+        if can_view_syllabuses
+        else Syllabus.objects.none()
+    )
     if search:
         announcements = announcements.filter(
             Q(title__icontains=search) | Q(summary__icontains=search) | Q(slug__icontains=search)
         )
         faqs = faqs.filter(Q(question__icontains=search) | Q(answer__icontains=search))
+        syllabuses = syllabuses.filter(Q(title__icontains=search) | Q(description__icontains=search))
     if status_filter in PublicationStatus.values:
         announcements = announcements.filter(status=status_filter)
         faqs = faqs.filter(status=status_filter)
+        syllabuses = syllabuses.filter(status=status_filter)
+    question_papers = (
+        QuestionPaper.objects.all() if request.user.has_perm("cms.view_questionpaper") else QuestionPaper.objects.none()
+    )
+    if search:
+        question_papers = question_papers.filter(
+            Q(title__icontains=search) | Q(description__icontains=search) | Q(category__icontains=search)
+        )
+    if status_filter in PublicationStatus.values:
+        question_papers = question_papers.filter(status=status_filter)
     return render(
         request,
         "cms/dashboard.html",
         {
             "announcements": Paginator(announcements, 10).get_page(request.GET.get("announcement_page")),
             "faqs": Paginator(faqs, 10).get_page(request.GET.get("faq_page")),
+            "syllabuses": syllabuses,
+            "question_papers": question_papers,
+            "can_view_content": can_view_content,
+            "can_view_syllabuses": can_view_syllabuses,
             "can_publish_announcements": request.user.has_perm("cms.publish_announcement"),
             "can_publish_faqs": request.user.has_perm("cms.publish_faq"),
+            "can_publish_question_papers": request.user.has_perm("cms.publish_questionpaper"),
+            "can_publish_syllabuses": request.user.has_perm("competitions.publish_syllabus"),
+            "can_manage_about": request.user.has_perm("cms.manage_aboutpage"),
+            "can_manage_question_papers": request.user.has_perm("cms.add_questionpaper")
+            or request.user.has_perm("cms.change_questionpaper"),
+            "can_manage_syllabuses": request.user.has_perm("competitions.add_syllabus")
+            or request.user.has_perm("competitions.change_syllabus"),
             "can_change_site_settings": request.user.has_perm("cms.change_sitesettings"),
             "can_view_audit": request.user.has_perm("audit.view_auditlog"),
             "search": search,
             "status_filter": status_filter,
             "publication_statuses": PublicationStatus.choices,
+        },
+    )
+
+
+@login_required
+@permission_required("cms.manage_aboutpage", raise_exception=True)
+def about_page_edit(request):
+    about, _ = AboutPage.objects.get_or_create(pk=1)
+    form = AboutPageForm(request.POST or None, instance=about)
+    if request.method == "POST" and form.is_valid():
+        about = form.save()
+        record_event(request, action="about_page.updated", instance=about)
+        messages.success(request, "About page updated.")
+        return redirect("cms-dashboard")
+    if request.method == "POST":
+        messages.warning(request, "Please review the highlighted fields and try again.")
+    return render(request, "cms/about_form.html", {"form": form})
+
+
+@login_required
+@permission_required("cms.add_questionpaper", raise_exception=True)
+def question_paper_create(request):
+    return question_paper_edit(request, None)
+
+
+@login_required
+@permission_required("cms.change_questionpaper", raise_exception=True)
+def question_paper_update(request, pk):
+    return question_paper_edit(request, get_object_or_404(QuestionPaper, pk=pk))
+
+
+def question_paper_edit(request, instance):
+    creating = instance is None
+    action = request.POST.get("action", "draft") if request.method == "POST" else "draft"
+    if request.method == "POST" and action == "publish" and not request.user.has_perm(
+        "cms.publish_questionpaper"
+    ):
+        raise PermissionDenied
+    form = QuestionPaperForm(request.POST or None, request.FILES or None, instance=instance)
+    if request.method == "POST" and form.is_valid():
+        paper = form.save(commit=False)
+        paper.status = (
+            PublicationStatus.PUBLISHED if action == "publish" else PublicationStatus.DRAFT
+        )
+        paper.published_at = timezone.now() if action == "publish" else None
+        if creating:
+            paper.created_by = request.user
+        paper.save()
+        record_event(
+            request,
+            action="question_paper.published" if action == "publish" else "question_paper.saved_draft",
+            instance=paper,
+        )
+        messages.success(
+            request,
+            "Question PDF published." if action == "publish" else "Question PDF draft saved.",
+        )
+        return redirect("cms-dashboard")
+    if request.method == "POST":
+        messages.warning(request, "Please review the highlighted fields and try again.")
+    return render(
+        request,
+        "cms/question_paper_form.html",
+        {
+            "form": form,
+            "creating": creating,
+            "instance": instance,
+            "can_publish": request.user.has_perm("cms.publish_questionpaper"),
+        },
+    )
+
+
+@login_required
+@permission_required("cms.change_questionpaper", raise_exception=True)
+def question_paper_archive(request, pk):
+    if request.method != "POST":
+        raise Http404
+    paper = get_object_or_404(QuestionPaper, pk=pk)
+    paper.status = PublicationStatus.ARCHIVED
+    paper.save(update_fields=["status", "updated_at"])
+    record_event(request, action="question_paper.archived", instance=paper)
+    messages.success(request, "Question PDF archived.")
+    return redirect("cms-dashboard")
+
+
+def question_paper_download(request, pk):
+    paper = get_object_or_404(QuestionPaper, pk=pk)
+    if not paper.is_public():
+        raise Http404
+    return FileResponse(
+        paper.pdf_file.open("rb"),
+        as_attachment=True,
+        filename=paper.pdf_file.name.rsplit("/", 1)[-1],
+        content_type="application/pdf",
+    )
+
+
+@login_required
+@permission_required("competitions.add_syllabus", raise_exception=True)
+def syllabus_create(request):
+    return syllabus_edit(request, None)
+
+
+@login_required
+@permission_required("competitions.change_syllabus", raise_exception=True)
+def syllabus_update(request, pk):
+    return syllabus_edit(request, get_object_or_404(Syllabus, pk=pk))
+
+
+def syllabus_edit(request, instance):
+    creating = instance is None
+    action = request.POST.get("action", "draft") if request.method == "POST" else "draft"
+    if request.method == "POST" and action == "publish" and not request.user.has_perm(
+        "competitions.publish_syllabus"
+    ):
+        raise PermissionDenied
+    form = SyllabusForm(request.POST or None, instance=instance)
+    topic_formset = SyllabusTopicFormSet(
+        request.POST or None,
+        instance=instance,
+        prefix="topics",
+    )
+    if request.method == "POST" and form.is_valid() and topic_formset.is_valid():
+        with transaction.atomic():
+            syllabus = form.save(commit=False)
+            syllabus.status = (
+                Syllabus.Status.PUBLISHED if action == "publish" else Syllabus.Status.DRAFT
+            )
+            syllabus.save()
+            topic_formset.instance = syllabus
+            topic_formset.save()
+        record_event(
+            request,
+            action="syllabus.published" if action == "publish" else "syllabus.saved_draft",
+            instance=syllabus,
+        )
+        messages.success(
+            request,
+            "Syllabus published." if action == "publish" else "Syllabus draft saved.",
+        )
+        return redirect("cms-dashboard")
+    if request.method == "POST":
+        messages.warning(request, "Please review the highlighted fields and try again.")
+    return render(
+        request,
+        "cms/syllabus_form.html",
+        {
+            "form": form,
+            "topic_formset": topic_formset,
+            "creating": creating,
+            "can_publish": request.user.has_perm("competitions.publish_syllabus"),
         },
     )
 

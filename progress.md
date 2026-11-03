@@ -2,6 +2,20 @@
 
 Last updated: 2026-11-03
 
+## Completed work — logo sizing and password visibility
+
+- Constrained the header logo to a consistent 140 × 64 px area while preserving its image proportions.
+- Added accessible eye controls to password inputs so users can show or hide entered passwords across account forms.
+
+## Completed work — editable About, syllabus, practice PDFs and birthdate calendar
+
+- Added a public About page with editable title, introduction and body content, managed from the custom staff content desk.
+- Added frontend syllabus management by season and grade, including editable topic rows and separate draft/publish permissions.
+- Added content-desk PDF upload, edit and archive workflows with year/category metadata, 20 MB size and PDF-signature validation, publication gating, and attachment-only downloads.
+- Added public Practice-page year and category filters, including all-years/all-categories options and matching download buttons above existing practice resources.
+- Replaced the browser-native birthdate field picker with a branded, keyboard-operable calendar that matches the site's colors and prevents selecting future dates.
+- Verified all 55 application tests, Django system checks, migration consistency, and JavaScript syntax.
+
 ## Completed work — hero slider transitions
 
 - Added five distinct smooth entrance effects to the homepage hero images. Effects rotate by slide position, so later slides use varied transitions without additional configuration.

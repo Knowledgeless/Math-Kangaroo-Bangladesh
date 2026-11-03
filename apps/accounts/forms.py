@@ -17,13 +17,27 @@ class StyledForm(forms.Form):
             field.widget.attrs.setdefault("class", "form-control")
 
 
+class BrandedDateInput(forms.DateInput):
+    input_type = "text"
+
+    def __init__(self, attrs=None, format=None):
+        widget_attrs = {
+            "autocomplete": "bday",
+            "placeholder": "YYYY-MM-DD",
+            "inputmode": "numeric",
+            "data-custom-date-picker": "true",
+        }
+        widget_attrs.update(attrs or {})
+        super().__init__(attrs=widget_attrs, format=format or "%Y-%m-%d")
+
+
 class StudentSignupForm(StyledForm):
     first_name = forms.CharField(max_length=150, label="Student's first name")
     last_name = forms.CharField(max_length=150, label="Student's last name")
     email = forms.EmailField(label="Email address for updates and password recovery")
     date_of_birth = forms.DateField(
         label="Date of birth",
-        widget=forms.DateInput(attrs={"type": "date", "autocomplete": "bday"}),
+        widget=BrandedDateInput(),
     )
     phone = forms.CharField(max_length=24, required=False, label="Student phone (optional)")
     guardian_name = forms.CharField(max_length=150, label="Parent or guardian name")
@@ -90,7 +104,7 @@ class StudentProfileForm(StyledForm):
     email = forms.EmailField(label="Email address")
     date_of_birth = forms.DateField(
         label="Date of birth",
-        widget=forms.DateInput(attrs={"type": "date", "autocomplete": "bday"}),
+        widget=BrandedDateInput(),
     )
     phone = forms.CharField(max_length=24, required=False, label="Student phone (optional)")
     guardian_name = forms.CharField(max_length=150, label="Parent or guardian name")

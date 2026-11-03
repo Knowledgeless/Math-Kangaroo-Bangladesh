@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -22,6 +22,19 @@ class SiteSettings(models.Model):
 
     def __str__(self):
         return self.site_name
+
+
+class AboutPage(models.Model):
+    title = models.CharField(max_length=160, default="About Math Kangaroo Bangladesh")
+    introduction = models.CharField(max_length=320, default="A joyful mathematics challenge for curious students.")
+    content = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        permissions = [("manage_aboutpage", "Can manage the About page")]
+
+    def __str__(self):
+        return self.title
 
 
 class HeroSlide(models.Model):
@@ -193,3 +206,46 @@ class PublicResource(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class QuestionPaper(models.Model):
+    MAX_FILE_SIZE = 20 * 1024 * 1024
+
+    title = models.CharField(max_length=180)
+    description = models.CharField(max_length=320, blank=True)
+    year = models.PositiveSmallIntegerField(validators=[MinValueValidator(2000), MaxValueValidator(9999)])
+    category = models.CharField(max_length=80)
+    pdf_file = models.FileField(
+        upload_to="question-papers/",
+        validators=[FileExtensionValidator(allowed_extensions=["pdf"])],
+    )
+    status = models.CharField(max_length=16, choices=PublicationStatus.choices, default=PublicationStatus.DRAFT)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="question_papers",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-year", "category", "title"]
+        permissions = [("publish_questionpaper", "Can publish question papers")]
+        indexes = [models.Index(fields=["status", "year", "category"], name="question_paper_filter_idx")]
+
+    def clean(self):
+        if self.pdf_file and self.pdf_file.size > self.MAX_FILE_SIZE:
+            raise ValidationError({"pdf_file": "Choose a PDF smaller than 20 MB."})
+
+    def is_public(self):
+        return (
+            self.status == PublicationStatus.PUBLISHED
+            and (self.published_at is None or self.published_at <= timezone.now())
+            and bool(self.pdf_file)
+        )
+
+    def __str__(self):
+        return f"{self.year} — {self.category}: {self.title}"
