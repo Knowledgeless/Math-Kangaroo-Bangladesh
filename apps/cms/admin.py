@@ -1,14 +1,35 @@
 from django.contrib import admin
 
 from apps.audit.models import record_event
+from .forms import AboutPageImageForm, AnnouncementImageForm
 from .models import (
+    AboutPage,
+    AboutPageImage,
     Announcement,
+    AnnouncementImage,
     FAQ,
     FAQCategory,
     PublicResource,
     PublicationStatus,
     SiteSettings,
 )
+
+
+class AboutPageImageInline(admin.TabularInline):
+    model = AboutPageImage
+    form = AboutPageImageForm
+    extra = 1
+
+
+@admin.register(AboutPage)
+class AboutPageAdmin(admin.ModelAdmin):
+    inlines = [AboutPageImageInline]
+
+
+class AnnouncementImageInline(admin.TabularInline):
+    model = AnnouncementImage
+    form = AnnouncementImageForm
+    extra = 1
 
 
 @admin.register(Announcement)
@@ -18,6 +39,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
     search_fields = ("title", "summary", "content")
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ("status", "published_at", "author", "created_at", "updated_at")
+    inlines = [AnnouncementImageInline]
 
     def save_model(self, request, obj, form, change):
         obj.status = PublicationStatus.DRAFT

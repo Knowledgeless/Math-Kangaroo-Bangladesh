@@ -288,6 +288,21 @@
     });
   });
 
+  document.querySelectorAll("[data-image-formset]").forEach((form) => {
+    const list = form.querySelector("[data-image-list]");
+    const template = form.querySelector("template[data-image-empty-form]");
+    const totalForms = form.querySelector('input[name$="-TOTAL_FORMS"]');
+    const addButton = form.querySelector("[data-add-image]");
+    if (!list || !template || !totalForms || !addButton) return;
+    addButton.addEventListener("click", () => {
+      const index = Number(totalForms.value);
+      const fragment = document.createElement("div");
+      fragment.innerHTML = template.innerHTML.replaceAll("__prefix__", String(index));
+      list.append(fragment.firstElementChild);
+      totalForms.value = String(index + 1);
+    });
+  });
+
   document.querySelectorAll("[data-hero-slider]").forEach((slider) => {
     const slides = [...slider.querySelectorAll("[data-hero-slide]")];
     const position = slider.querySelector("[data-hero-position]");

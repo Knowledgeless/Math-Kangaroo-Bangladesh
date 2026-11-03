@@ -3,6 +3,45 @@
 {% block staff_page_label %}Announcement{% endblock %}
 {% block staff_content %}
 <section class="cms-form-shell"><a class="back-link" href="{% url 'cms-dashboard' %}"><i class="bi bi-chevron-left" aria-hidden="true"></i> Content desk</a><div class="form-page-heading"><span class="eyebrow">Noticeboard</span><h1>{% if creating %}Write an update.{% else %}Shape this update.{% endif %}</h1><p>Save a draft first, then a publisher can make it public.</p></div>
-  <form method="post" class="cms-form">{% csrf_token %}{% for field in form %}<div class="form-field {% if field.name == 'content' %}field-full{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}{% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}<div class="form-actions"><button class="button button-outline" type="submit" name="action" value="draft">Save draft</button>{% if can_publish %}<button class="button button-dark" type="submit" name="action" value="publish">Publish update <i class="bi bi-arrow-up-right" aria-hidden="true"></i></button>{% endif %}</div></form>
+  <form method="post" enctype="multipart/form-data" class="cms-form" data-image-formset>{% csrf_token %}{% for field in form %}<div class="form-field {% if field.name == 'content' %}field-full{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}{% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+    <section class="announcement-image-editor field-full">
+      <div class="cms-section-heading">
+        <div><span class="eyebrow">Optional photos</span><h2>Announcement images</h2></div>
+        <button class="button button-outline button-small" type="button" data-add-image><i class="bi bi-plus-lg" aria-hidden="true"></i> Add image</button>
+      </div>
+      <p class="field-help">Upload one or more images. Each image must be exactly 1200 × 630 pixels and smaller than 300 KB.</p>
+      {{ image_formset.management_form }}
+      {% if image_formset.non_form_errors %}<div class="form-errors">{{ image_formset.non_form_errors }}</div>{% endif %}
+      <div class="announcement-image-list" data-image-list>
+        {% for image_form in image_formset %}
+          <div class="announcement-image-row" data-image-row>
+            {% for hidden in image_form.hidden_fields %}{{ hidden }}{% endfor %}
+            {% if image_form.instance.pk and image_form.instance.image %}<img class="announcement-image-preview" src="{{ image_form.instance.image.url }}" alt="">{% endif %}
+            <div class="announcement-image-fields">
+              {% for field in image_form.visible_fields %}
+                {% if field.name != "DELETE" %}
+                  <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>
+                {% endif %}
+              {% endfor %}
+              <label class="syllabus-topic-remove">{{ image_form.DELETE }}<span>Remove image</span></label>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <template data-image-empty-form>
+        <div class="announcement-image-row" data-image-row>
+          {% for hidden in image_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+          <div class="announcement-image-fields">
+            {% for field in image_formset.empty_form.visible_fields %}
+              {% if field.name != "DELETE" %}
+                <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>
+              {% endif %}
+            {% endfor %}
+            <label class="syllabus-topic-remove">{{ image_formset.empty_form.DELETE }}<span>Remove image</span></label>
+          </div>
+        </div>
+      </template>
+    </section>
+    <div class="form-actions"><button class="button button-outline" type="submit" name="action" value="draft">Save draft</button>{% if can_publish %}<button class="button button-dark" type="submit" name="action" value="publish">Publish update <i class="bi bi-arrow-up-right" aria-hidden="true"></i></button>{% endif %}</div></form>
 </section>
 {% endblock %}

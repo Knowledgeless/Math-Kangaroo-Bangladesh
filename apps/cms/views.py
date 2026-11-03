@@ -17,7 +17,9 @@ from apps.audit.models import AuditLog, record_event
 from apps.competitions.models import CompetitionLevel, CompetitionSeason, Syllabus
 from .forms import (
     AboutPageForm,
+    AboutPageImageFormSet,
     AnnouncementForm,
+    AnnouncementImageFormSet,
     FAQForm,
     HeroSlideForm,
     HeroSlideOrderForm,
@@ -109,7 +111,7 @@ def hero_slide_archive(request, pk):
 def _home_context(request):
     announcements = Announcement.objects.filter(
         status=PublicationStatus.PUBLISHED,
-    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now()))
+    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())).prefetch_related("images")
     current_season = CompetitionSeason.objects.filter(is_current=True).first()
     can_manage_hero = (
         request.user.is_authenticated
@@ -147,7 +149,7 @@ def _home_context(request):
 def announcement_list(request):
     announcements = Announcement.objects.filter(
         status=PublicationStatus.PUBLISHED,
-    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now()))
+    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())).prefetch_related("images")
     search = request.GET.get("q", "").strip()
     category = request.GET.get("category", "")
     year = request.GET.get("year", "")
@@ -183,9 +185,9 @@ def announcement_list(request):
 def announcement_detail(request, slug):
     now = timezone.now()
     announcement = get_object_or_404(
-        Announcement.objects.filter(status=PublicationStatus.PUBLISHED).filter(
-            Q(published_at__isnull=True) | Q(published_at__lte=now)
-        ),
+        Announcement.objects.filter(status=PublicationStatus.PUBLISHED)
+        .filter(Q(published_at__isnull=True) | Q(published_at__lte=now))
+        .prefetch_related("images"),
         slug=slug,
     )
     related = Announcement.objects.filter(
@@ -220,13 +222,30 @@ def about_page(request):
     )
     content_html = sanitize_about_content(about.content) if about else ""
     lead_match = (
-        re.match(r"(?s)(<h2>.*?</h2>.*?)(?=<h2>|$)", content_html)
+        re.match(r"(?s)(<h2>.*?</h2>)", content_html)
         if not (about_title or about_introduction)
         else None
     )
     lead_html = lead_match.group(1).strip() if lead_match else ""
     remaining_content_html = content_html[len(lead_match.group(1)):].strip() if lead_match else content_html
     page_heading = re.search(r"<h2>(.*?)</h2>", lead_html or content_html)
+    lead_body_match = (
+        re.match(r"(?s)(<p>.*?</p>)", remaining_content_html)
+        if lead_match
+        else None
+    )
+    lead_body_html = lead_body_match.group(1) if lead_body_match else ""
+    if lead_body_match:
+        remaining_content_html = remaining_content_html[len(lead_body_match.group(1)):].strip()
+    about_sections = []
+    if remaining_content_html:
+        section_blocks = re.split(r"(?=<h2>)", remaining_content_html)
+        for section_block in section_blocks:
+            section_match = re.match(r"(?s)<h2>(.*?)</h2>(.*)", section_block)
+            heading_html = f"<h2>{section_match.group(1)}</h2>" if section_match else ""
+            body_html = section_match.group(2).strip() if section_match else section_block.strip()
+            if heading_html or body_html:
+                about_sections.append({"heading_html": heading_html, "body_html": body_html})
     document_title = about_title or (
         unescape(strip_tags(page_heading.group(1))) if page_heading else ""
     )
@@ -238,8 +257,11 @@ def about_page(request):
             "about_title": about_title,
             "about_introduction": about_introduction,
             "about_document_title": document_title,
-            "about_lead_html": lead_html,
+            "about_lead_html": lead_body_html,
+            "about_feature_heading_html": lead_html,
             "about_content_html": remaining_content_html,
+            "about_sections": about_sections,
+            "about_images": about.images.all() if about else (),
         },
     )
 
@@ -376,14 +398,29 @@ def content_dashboard(request):
 def about_page_edit(request):
     about, _ = AboutPage.objects.get_or_create(pk=1)
     form = AboutPageForm(request.POST or None, instance=about)
-    if request.method == "POST" and form.is_valid():
-        about = form.save()
+    bind_images = request.method == "POST" and (
+        "images-TOTAL_FORMS" in request.POST or bool(request.FILES)
+    )
+    image_formset = AboutPageImageFormSet(
+        request.POST if bind_images else None,
+        request.FILES if bind_images else None,
+        instance=about,
+        prefix="images",
+    )
+    if request.method == "POST" and form.is_valid() and (
+        not image_formset.is_bound or image_formset.is_valid()
+    ):
+        with transaction.atomic():
+            about = form.save()
+            if image_formset.is_bound:
+                image_formset.instance = about
+                image_formset.save()
         record_event(request, action="about_page.updated", instance=about)
         messages.success(request, "About page updated.")
         return redirect("cms-dashboard")
     if request.method == "POST":
         messages.warning(request, "Please review the highlighted fields and try again.")
-    return render(request, "cms/about_form.html", {"form": form})
+    return render(request, "cms/about_form.html", {"form": form, "image_formset": image_formset})
 
 
 @login_required
@@ -569,13 +606,28 @@ def announcement_edit(request, instance):
     if request.method == "POST" and action == "publish" and not request.user.has_perm("cms.publish_announcement"):
         raise PermissionDenied
     form = AnnouncementForm(request.POST or None, instance=instance)
-    if request.method == "POST" and form.is_valid():
-        announcement = form.save(commit=False)
-        if creating:
-            announcement.author = request.user
-        announcement.status = PublicationStatus.PUBLISHED if action == "publish" else PublicationStatus.DRAFT
-        announcement.published_at = timezone.now() if action == "publish" else None
-        announcement.save()
+    bind_images = request.method == "POST" and (
+        "images-TOTAL_FORMS" in request.POST or bool(request.FILES)
+    )
+    image_formset = AnnouncementImageFormSet(
+        request.POST if bind_images else None,
+        request.FILES if bind_images else None,
+        instance=instance or Announcement(),
+        prefix="images",
+    )
+    if request.method == "POST" and form.is_valid() and (
+        not image_formset.is_bound or image_formset.is_valid()
+    ):
+        with transaction.atomic():
+            announcement = form.save(commit=False)
+            if creating:
+                announcement.author = request.user
+            announcement.status = PublicationStatus.PUBLISHED if action == "publish" else PublicationStatus.DRAFT
+            announcement.published_at = timezone.now() if action == "publish" else None
+            announcement.save()
+            if image_formset.is_bound:
+                image_formset.instance = announcement
+                image_formset.save()
         record_event(
             request,
             action="announcement.published" if action == "publish" else "announcement.saved_draft",
@@ -588,7 +640,12 @@ def announcement_edit(request, instance):
     return render(
         request,
         "cms/announcement_form.html",
-        {"form": form, "creating": creating, "can_publish": request.user.has_perm("cms.publish_announcement")},
+        {
+            "form": form,
+            "image_formset": image_formset,
+            "creating": creating,
+            "can_publish": request.user.has_perm("cms.publish_announcement"),
+        },
     )
 
 

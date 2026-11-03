@@ -37,6 +37,19 @@ class AboutPage(models.Model):
         return self.title
 
 
+class AboutPageImage(models.Model):
+    about_page = models.ForeignKey(AboutPage, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="about-page/")
+    alt_text = models.CharField(max_length=180, blank=True)
+    display_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["display_order", "pk"]
+
+    def __str__(self):
+        return self.alt_text or self.image.name
+
+
 class HeroSlide(models.Model):
     MAX_IMAGE_SIZE = 300 * 1024
 
@@ -114,6 +127,21 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class AnnouncementImage(models.Model):
+    MAX_IMAGE_SIZE = 300 * 1024
+
+    announcement = models.ForeignKey(Announcement, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="announcements/")
+    alt_text = models.CharField(max_length=180)
+    display_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["display_order", "pk"]
+
+    def __str__(self):
+        return self.alt_text
 
 
 class FAQCategory(models.Model):

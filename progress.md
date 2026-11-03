@@ -2,6 +2,15 @@
 
 Last updated: 2026-11-03
 
+## Completed work — About sample layout and managed image uploads
+
+- Reworked the public About page to use the saved About copy as its heading and section text, styled after `static/images/about_sample.png`; no placeholder story text or stock photo is shown.
+- About paragraphs are justified. Added repeatable About-page photo rows with alt text, ordering, preview, and removal in the content desk; only uploaded photos appear publicly.
+- Added repeatable announcement image rows with alt text, ordering, preview, and removal in the content desk. Every new announcement image must be exactly 1200 × 630 pixels and smaller than 300 KB.
+- Announcement images appear on public announcement cards, the homepage cards, and announcement details. Existing external cover-image fields remain available as a fallback.
+- Added and applied CMS migration `0009_aboutpageimage_announcementimage`.
+- Verified 63 account/CMS/competition tests, Django system checks, migration consistency, JavaScript syntax, and the live About page text alignment.
+
 ## Completed work — logo sizing and password visibility
 
 - Constrained the header logo to a consistent 140 × 64 px area while preserving its image proportions.
@@ -97,8 +106,9 @@ Use `Math_Kangaroo_Bangladesh_Django_Blueprint.md` as the architecture source of
 
 - `python manage.py check` — passed.
 - `python manage.py makemigrations --check --dry-run` — no model changes pending.
-- `python manage.py test apps.accounts.tests apps.cms.tests apps.competitions.tests` — 39 tests passed.
+- `python manage.py test apps.accounts.tests apps.cms.tests apps.competitions.tests` — 63 tests passed.
 - `node --check static/js/site.js` — passed.
+- CMS migration `0009_aboutpageimage_announcementimage` — applied to the local database.
 - Updated dashboard templates compiled successfully.
 - The test runner applies migrations to its isolated test database. Back up the local/production database before applying the participant-username data migration to a persistent database.
 

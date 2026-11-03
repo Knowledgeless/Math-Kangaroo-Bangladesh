@@ -18,10 +18,12 @@ from datetime import timedelta
 from apps.audit.models import AuditLog
 from apps.competitions.models import CompetitionDivision, CompetitionLevel, CompetitionSeason, Syllabus
 from .admin import AnnouncementAdmin
-from .forms import AboutPageForm, HeroSlideForm, QuestionPaperForm
+from .forms import AboutPageForm, AnnouncementImageForm, HeroSlideForm, QuestionPaperForm
 from .models import (
     AboutPage,
+    AboutPageImage,
     Announcement,
+    AnnouncementImage,
     FAQ,
     FAQCategory,
     HeroSlide,
@@ -37,6 +39,12 @@ def uploaded_hero_image(width=1200, height=630):
     buffer = BytesIO()
     Image.new("RGB", (width, height), color=(72, 112, 78)).save(buffer, format="JPEG")
     return SimpleUploadedFile("hero.jpg", buffer.getvalue(), content_type="image/jpeg")
+
+
+def uploaded_test_image(name="news.jpg", width=1200, height=630, padding=0):
+    buffer = BytesIO()
+    Image.new("RGB", (width, height), color=(72, 112, 78)).save(buffer, format="JPEG")
+    return SimpleUploadedFile(name, buffer.getvalue() + b"x" * padding, content_type="image/jpeg")
 
 
 class PublicContentTests(TestCase):
@@ -122,6 +130,26 @@ class PublicContentTests(TestCase):
         with self.assertRaises(ValidationError) as error:
             announcement.full_clean()
         self.assertIn("cover_image_alt_text", error.exception.message_dict)
+
+    def test_announcement_image_uploads_require_1200_by_630_and_under_300_kb(self):
+        valid = AnnouncementImageForm(
+            {"alt_text": "Students at the competition", "display_order": "0"},
+            {"image": uploaded_test_image()},
+        )
+        wrong_ratio = AnnouncementImageForm(
+            {"alt_text": "Students at the competition", "display_order": "0"},
+            {"image": uploaded_test_image(width=1199)},
+        )
+        oversized = AnnouncementImageForm(
+            {"alt_text": "Students at the competition", "display_order": "0"},
+            {"image": uploaded_test_image(padding=AnnouncementImage.MAX_IMAGE_SIZE)},
+        )
+
+        self.assertTrue(valid.is_valid(), valid.errors)
+        self.assertFalse(wrong_ratio.is_valid())
+        self.assertIn("1200 × 630", str(wrong_ratio.errors))
+        self.assertFalse(oversized.is_valid())
+        self.assertIn("smaller than 300 KB", str(oversized.errors))
 
     def test_about_page_uses_managed_content_when_available(self):
         response = self.client.get(reverse("about"))
@@ -328,6 +356,51 @@ class ContentWorkflowTests(TestCase):
         self.assertRedirects(response, reverse("cms-dashboard"))
         self.assertEqual(Announcement.objects.get(slug="draft-update").status, PublicationStatus.DRAFT)
 
+    def test_announcement_editor_exposes_repeatable_image_upload_fields(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("cms-announcement-create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'enctype="multipart/form-data"')
+        self.assertContains(response, 'name="images-0-image"')
+        self.assertContains(response, "1200 × 630")
+        self.assertContains(response, "smaller than 300 KB")
+        self.assertContains(response, "data-add-image")
+
+    def test_publisher_can_upload_multiple_announcement_images(self):
+        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+            self.client.force_login(self.user)
+            response = self.client.post(
+                reverse("cms-announcement-create"),
+                {
+                    "title": "Competition photo update",
+                    "slug": "competition-photo-update",
+                    "summary": "Photos from the event.",
+                    "content": "The competition brought students together.",
+                    "category": "competition",
+                    "images-TOTAL_FORMS": "2",
+                    "images-INITIAL_FORMS": "0",
+                    "images-MIN_NUM_FORMS": "0",
+                    "images-MAX_NUM_FORMS": "1000",
+                    "images-0-image": uploaded_test_image("event-one.jpg"),
+                    "images-0-alt_text": "Students solving a problem",
+                    "images-0-display_order": "0",
+                    "images-1-image": uploaded_test_image("event-two.jpg"),
+                    "images-1-alt_text": "Students sharing their answers",
+                    "images-1-display_order": "1",
+                    "action": "publish",
+                },
+            )
+
+            self.assertRedirects(response, reverse("cms-dashboard"))
+            announcement = Announcement.objects.get(slug="competition-photo-update")
+            self.assertEqual(announcement.images.count(), 2)
+            detail = self.client.get(announcement.get_absolute_url())
+            self.assertContains(detail, "Students solving a problem")
+            self.assertContains(detail, "Students sharing their answers")
+            self.assertContains(self.client.get(reverse("announcement-list")), "Students solving a problem")
+            self.assertContains(self.client.get(reverse("home")), "Students solving a problem")
+
     def test_staff_can_reach_older_announcements_through_pagination(self):
         self.client.force_login(self.user)
         for index in range(11):
@@ -452,6 +525,9 @@ class NewContentManagementTests(TestCase):
         self.client.force_login(self.user)
         dashboard = self.client.get(reverse("cms-dashboard"))
         self.assertContains(dashboard, "Manage About page")
+        edit_page = self.client.get(reverse("cms-about-edit"))
+        self.assertContains(edit_page, 'name="images-0-image"')
+        self.assertContains(edit_page, "data-add-image")
 
         response = self.client.post(
             reverse("cms-about-edit"),
@@ -463,6 +539,55 @@ class NewContentManagementTests(TestCase):
         )
         self.assertRedirects(response, reverse("cms-dashboard"))
         self.assertContains(self.client.get(reverse("about")), "Our Math Kangaroo story")
+
+    def test_about_page_image_can_be_uploaded_and_removed_in_the_content_desk(self):
+        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+            self.client.force_login(self.user)
+            response = self.client.post(
+                reverse("cms-about-edit"),
+                {
+                    "title": "About Math Kangaroo Bangladesh",
+                    "introduction": "A joyful mathematics challenge for curious students.",
+                    "content": "What is Math Kangaroo?\n\nA competition for curious learners.",
+                    "images-TOTAL_FORMS": "1",
+                    "images-INITIAL_FORMS": "0",
+                    "images-MIN_NUM_FORMS": "0",
+                    "images-MAX_NUM_FORMS": "1000",
+                    "images-0-image": uploaded_test_image("about.jpg"),
+                    "images-0-alt_text": "Students exploring mathematics",
+                    "images-0-display_order": "0",
+                    "action": "save",
+                },
+            )
+
+            self.assertRedirects(response, reverse("cms-dashboard"))
+            about_image = AboutPageImage.objects.get(alt_text="Students exploring mathematics")
+            page = self.client.get(reverse("about"))
+            self.assertContains(page, about_image.image.url)
+            self.assertContains(page, "Students exploring mathematics")
+
+            response = self.client.post(
+                reverse("cms-about-edit"),
+                {
+                    "title": "About Math Kangaroo Bangladesh",
+                    "introduction": "A joyful mathematics challenge for curious students.",
+                    "content": "What is Math Kangaroo?\n\nA competition for curious learners.",
+                    "images-TOTAL_FORMS": "2",
+                    "images-INITIAL_FORMS": "1",
+                    "images-MIN_NUM_FORMS": "0",
+                    "images-MAX_NUM_FORMS": "1000",
+                    "images-0-id": str(about_image.pk),
+                    "images-0-about_page": str(about_image.about_page_id),
+                    "images-0-alt_text": about_image.alt_text,
+                    "images-0-display_order": "0",
+                    "images-0-DELETE": "on",
+                    "images-1-alt_text": "",
+                    "images-1-display_order": "0",
+                },
+            )
+
+            self.assertRedirects(response, reverse("cms-dashboard"))
+            self.assertFalse(AboutPageImage.objects.filter(pk=about_image.pk).exists())
 
     def test_about_page_rich_content_can_be_saved_and_rendered(self):
         self.client.force_login(self.user)

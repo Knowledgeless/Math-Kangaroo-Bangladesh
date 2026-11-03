@@ -7,7 +7,7 @@
   <article class="article-content">
     <div class="meta-line"><span class="category-pill">{{ announcement.get_category_display }}</span>{% if announcement.published_at %}<time datetime="{{ announcement.published_at|date:'c' }}">{{ announcement.published_at|date:"F j, Y" }}</time>{% endif %}</div>
     <h1>{{ announcement.title }}</h1><p class="article-summary">{{ announcement.summary }}</p>
-    {% if announcement.cover_image_url %}<img class="article-image" src="{{ announcement.cover_image_url }}" alt="{{ announcement.cover_image_alt_text }}" loading="lazy" referrerpolicy="no-referrer">{% endif %}
+    {% for image in announcement.images.all %}<img class="article-image" src="{{ image.image.url }}" alt="{{ image.alt_text }}" loading="lazy">{% empty %}{% if announcement.cover_image_url %}<img class="article-image" src="{{ announcement.cover_image_url }}" alt="{{ announcement.cover_image_alt_text }}" loading="lazy" referrerpolicy="no-referrer">{% endif %}{% endfor %}
     <div class="article-body">{{ announcement.content|linebreaks }}</div>
     <div class="article-end"><i class="bi bi-stars" aria-hidden="true"></i><span>Keep wondering.</span></div>
   </article>

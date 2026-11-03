@@ -5,7 +5,16 @@ from django.db.models import Q
 
 from apps.competitions.models import CompetitionDivision, Syllabus, SyllabusTopic
 from .content_sanitizer import sanitize_about_content
-from .models import AboutPage, Announcement, FAQ, HeroSlide, QuestionPaper, SiteSettings
+from .models import (
+    AboutPage,
+    AboutPageImage,
+    Announcement,
+    AnnouncementImage,
+    FAQ,
+    HeroSlide,
+    QuestionPaper,
+    SiteSettings,
+)
 
 
 class StyledModelForm(forms.ModelForm):
@@ -38,6 +47,39 @@ class AnnouncementForm(StyledModelForm):
             "summary": forms.Textarea(attrs={"rows": 3}),
             "meta_description": forms.Textarea(attrs={"rows": 2}),
         }
+
+
+class AnnouncementImageField(forms.ImageField):
+    def clean(self, data, initial=None):
+        image = super().clean(data, initial)
+        if isinstance(data, UploadedFile):
+            if data.size >= AnnouncementImage.MAX_IMAGE_SIZE:
+                raise forms.ValidationError("Choose an image smaller than 300 KB.")
+            if image.image.width * 630 != image.image.height * 1200:
+                raise forms.ValidationError("Use an image with a 1200 × 630 (40:21) ratio.")
+        return image
+
+
+class AnnouncementImageForm(StyledModelForm):
+    image = AnnouncementImageField(
+        required=False,
+        label="Image",
+        help_text="Use a 1200 × 630 image smaller than 300 KB.",
+    )
+
+    class Meta:
+        model = AnnouncementImage
+        fields = ("image", "alt_text", "display_order")
+        widgets = {"display_order": forms.NumberInput(attrs={"min": 0, "max": 65535})}
+
+
+AnnouncementImageFormSet = inlineformset_factory(
+    Announcement,
+    AnnouncementImage,
+    form=AnnouncementImageForm,
+    extra=1,
+    can_delete=True,
+)
 
 
 class FAQForm(StyledModelForm):
@@ -98,6 +140,22 @@ class AboutPageForm(StyledModelForm):
 
     def clean_content(self):
         return sanitize_about_content(self.cleaned_data["content"])
+
+
+class AboutPageImageForm(StyledModelForm):
+    class Meta:
+        model = AboutPageImage
+        fields = ("image", "alt_text", "display_order")
+        widgets = {"display_order": forms.NumberInput(attrs={"min": 0, "max": 65535})}
+
+
+AboutPageImageFormSet = inlineformset_factory(
+    AboutPage,
+    AboutPageImage,
+    form=AboutPageImageForm,
+    extra=1,
+    can_delete=True,
+)
 
 
 class QuestionPaperForm(StyledModelForm):
