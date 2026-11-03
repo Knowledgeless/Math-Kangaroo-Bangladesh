@@ -1,6 +1,22 @@
 # Math Kangaroo Bangladesh — Project progress
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
+
+## Completed work — CMS category dropdown visibility and styling
+
+- Added a custom category picker that opens on hover, focus, or click, with keyboard selection, styled season groups, and a visible selected-category label.
+- Kept the form's existing duplicate-syllabus protection. The picker shows already-assigned categories with direct edit links instead of appearing empty when all categories are taken.
+- Hid the underlying submitted select so it no longer renders as a second visible control; the custom menu also opens on hover/focus without waiting for JavaScript.
+- Added regression assertions for the single visible picker, populated categories, and existing-syllabus entries.
+- Verified the category-picker regression test, Django system checks, JavaScript syntax, and `git diff --check`.
+
+## Completed work — paired-category syllabus picker and public redesign
+
+- Changed the CMS syllabus picker to offer each season/category once, with its combined two-grade range, instead of separate grade options.
+- Updated the public syllabus page to foreground categories and seasons, display each category's saved syllabus description and topics with its paired grade range, and expand the content area with responsive cards, transitions, and reduced-motion support through the site's shared accessibility rule.
+- Styled syllabus and topic titles in title case without changing the saved text.
+- Added regression assertions for the paired-grade CMS category picker.
+- Verified the category picker (including combined-grade labels, no duplicate category options, and editability), public syllabus/topic rendering, Django system checks, and `git diff --check`.
 
 ## Completed work — About sample layout and managed image uploads
 

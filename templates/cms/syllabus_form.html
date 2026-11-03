@@ -2,14 +2,185 @@
 {% block title %}{% if creating %}Add syllabus{% else %}Edit syllabus{% endif %} — Content desk{% endblock %}
 {% block staff_page_label %}Syllabus management{% endblock %}
 {% block staff_content %}
-<section class="cms-form-shell"><a class="back-link" href="{% url 'cms-dashboard' %}"><i class="bi bi-chevron-left" aria-hidden="true"></i> Content desk</a><div class="form-page-heading"><span class="eyebrow">Learning roadmap</span><h1>{% if creating %}Build a syllabus.{% else %}Update this syllabus.{% endif %}</h1><p>Choose a season and grade, then add the topics students should explore.</p></div>
-  <form method="post" class="cms-form syllabus-editor-form" data-topic-formset>{% csrf_token %}{% for field in form %}<div class="form-field field-full"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}{% if form.non_field_errors %}<div class="form-errors field-full">{{ form.non_field_errors }}</div>{% endif %}
-    <div class="syllabus-topic-editor field-full"><div class="cms-section-heading"><div><span class="eyebrow">Grade-level detail</span><h2>Topics</h2></div><button class="button button-outline button-small" type="button" data-add-topic><i class="bi bi-plus-lg" aria-hidden="true"></i> Add topic</button></div>
-      {{ topic_formset.management_form }}{% if topic_formset.non_form_errors %}<div class="form-errors">{{ topic_formset.non_form_errors }}</div>{% endif %}
-      <div class="syllabus-topic-list" data-topic-list>{% for topic_form in topic_formset %}<div class="syllabus-topic-row" data-topic-row>{% for hidden in topic_form.hidden_fields %}{{ hidden }}{% endfor %}<div class="syllabus-topic-fields">{% for field in topic_form.visible_fields %}{% if field.name != "DELETE" %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endif %}{% endfor %}<label class="syllabus-topic-remove">{{ topic_form.DELETE }}<span>Remove</span></label></div></div>{% endfor %}</div>
-      <template data-topic-empty-form><div class="syllabus-topic-row" data-topic-row>{% for hidden in topic_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}<div class="syllabus-topic-fields">{% for field in topic_formset.empty_form.visible_fields %}{% if field.name != "DELETE" %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endif %}{% endfor %}<label class="syllabus-topic-remove">{{ topic_formset.empty_form.DELETE }}<span>Remove</span></label></div></div></template>
+<section class="cms-form-shell">
+    <a class="back-link" href="{% url 'cms-dashboard' %}">
+        <i class="bi bi-chevron-left" aria-hidden="true"></i> Content desk
+    </a>
+
+    <div class="form-page-heading">
+        <span class="eyebrow">Learning roadmap</span>
+        <h1>
+            {% if creating %}
+                Build a syllabus.
+            {% else %}
+                Update this syllabus.
+            {% endif %}
+        </h1>
+        <p>Choose a season and category, then add the topics students should explore.</p>
     </div>
-    <div class="form-actions"><button class="button button-outline" type="submit" name="action" value="draft">Save draft</button>{% if can_publish %}<button class="button button-dark" type="submit" name="action" value="publish">{% if creating %}Publish syllabus{% else %}Save and publish{% endif %} <i class="bi bi-arrow-up-right" aria-hidden="true"></i></button>{% endif %}</div>
-  </form>
+
+    <form method="post" class="cms-form syllabus-editor-form" data-topic-formset>
+        {% csrf_token %}
+
+        {% for field in form %}
+            <div class="form-field field-full">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% if field.name == "division" %}
+                    <div class="syllabus-category-picker" data-syllabus-category-picker>
+                        {{ field }}
+                        <button class="syllabus-category-trigger" type="button" aria-label="Choose a competition category" aria-haspopup="menu" aria-expanded="false" aria-controls="syllabus-category-menu" data-category-trigger>
+                            <span data-category-value>Choose a competition category</span>
+                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <div class="syllabus-category-menu" id="syllabus-category-menu" role="menu" data-category-menu hidden>
+                            {% for group in form.category_choice_groups %}
+                                <div class="syllabus-category-group" role="group" aria-label="{{ group.label }}">
+                                    <span class="syllabus-category-season" role="presentation">{{ group.label }}</span>
+                                    {% for value, label in group.options %}
+                                        <button class="syllabus-category-option" type="button" role="menuitemradio" aria-checked="false" data-category-option data-value="{{ value }}">
+                                            <span><i class="bi bi-mortarboard" aria-hidden="true"></i>{{ label }}</span>
+                                            <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
+                                        </button>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                            {% for group in form.existing_category_groups %}
+                                <div class="syllabus-category-group syllabus-category-existing-group" role="group" aria-label="{{ group.label }}">
+                                    <span class="syllabus-category-season" role="presentation">{{ group.label }}</span>
+                                    {% for entry in group.syllabuses %}
+                                        <div class="syllabus-category-existing" role="none">
+                                            <span role="presentation"><i class="bi bi-mortarboard" aria-hidden="true"></i>{{ entry.category_label }}</span>
+                                            <span class="syllabus-category-status" role="presentation">Already added</span>
+                                            {% if can_edit_syllabuses %}
+                                                <a href="{% url 'cms-syllabus-edit' entry.syllabus.pk %}" role="menuitem">Edit <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                            {% if not form.category_choice_groups and not form.existing_category_groups %}
+                                <div class="syllabus-category-empty" role="status">
+                                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                    <div>
+                                        <strong>No competition categories are available yet.</strong>
+                                        <span>Set up a season and its categories before adding a syllabus.</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    {{ field }}
+                {% endif %}
+                {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+
+                {% for error in field.errors %}
+                    <p class="field-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endfor %}
+
+        {% if form.non_field_errors %}
+            <div class="form-errors field-full">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="syllabus-topic-editor field-full">
+            <div class="cms-section-heading">
+                <div>
+                    <span class="eyebrow">Grade-level detail</span>
+                    <h2>Topics</h2>
+                </div>
+            </div>
+
+            {{ topic_formset.management_form }}
+
+            {% if topic_formset.non_form_errors %}
+                <div class="form-errors">
+                    {{ topic_formset.non_form_errors }}
+                </div>
+            {% endif %}
+
+            <div class="syllabus-topic-list" data-topic-list>
+                {% for topic_form in topic_formset %}
+                    <div class="syllabus-topic-row" data-topic-row>
+                        {% for hidden in topic_form.hidden_fields %}
+                            {{ hidden }}
+                        {% endfor %}
+
+                        <div class="syllabus-topic-fields">
+                            {% for field in topic_form.visible_fields %}
+                                {% if field.name != "DELETE" %}
+                                    <div class="form-field">
+                                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        {{ field }}
+
+                                        {% for error in field.errors %}
+                                            <p class="field-error">{{ error }}</p>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+
+                            <label class="syllabus-topic-remove">
+                                {{ topic_form.DELETE }}
+                                <span>Remove</span>
+                            </label>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <template data-topic-empty-form>
+                <div class="syllabus-topic-row" data-topic-row>
+                    {% for hidden in topic_formset.empty_form.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+
+                    <div class="syllabus-topic-fields">
+                        {% for field in topic_formset.empty_form.visible_fields %}
+                            {% if field.name != "DELETE" %}
+                                <div class="form-field">
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+
+                                    {% for error in field.errors %}
+                                        <p class="field-error">{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+
+                        <label class="syllabus-topic-remove">
+                            {{ topic_formset.empty_form.DELETE }}
+                            <span>Remove</span>
+                        </label>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <div class="form-actions">
+            <button class="button button-outline button-small" type="button" data-add-topic>
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Add topic
+            </button>
+
+            <button class="button button-outline" type="submit" name="action" value="draft">
+                Save draft
+            </button>
+
+            {% if can_publish %}
+                <button class="button button-dark" type="submit" name="action" value="publish">
+                    {% if creating %}
+                        Publish syllabus
+                    {% else %}
+                        Save and publish
+                    {% endif %}
+                    <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
+                </button>
+            {% endif %}
+        </div>
+    </form>
 </section>
 {% endblock %}

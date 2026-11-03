@@ -644,9 +644,19 @@ class NewContentManagementTests(TestCase):
             max_grade=4,
         )
         division = CompetitionDivision.objects.create(season=season, level=level, grade=3)
+        CompetitionDivision.objects.create(season=season, level=level, grade=4)
         self.client.force_login(self.user)
         dashboard = self.client.get(reverse("cms-dashboard"))
         self.assertContains(dashboard, "Syllabus management")
+        form_page = self.client.get(reverse("cms-syllabus-create"))
+        self.assertContains(form_page, "2026 Olympiad")
+        self.assertContains(form_page, "CMS Test Ecolier — Grades 3–4")
+        self.assertContains(form_page, "data-syllabus-category-picker")
+        self.assertContains(form_page, "data-category-option")
+        self.assertRegex(form_page.content.decode(), r"<select[^>]*\shidden(?:\s|>)")
+        self.assertContains(form_page, "class=\"syllabus-category-trigger\"")
+        self.assertNotContains(form_page, "Grade 3</option>")
+        self.assertNotContains(form_page, "Grade 4</option>")
 
         response = self.client.post(
             reverse("cms-syllabus-create"),
@@ -669,7 +679,37 @@ class NewContentManagementTests(TestCase):
         syllabus = Syllabus.objects.get(division=division)
         self.assertEqual(syllabus.status, Syllabus.Status.PUBLISHED)
         self.assertEqual(syllabus.topics.get().topic, "Patterns")
-        self.assertContains(self.client.get(reverse("syllabus")), "Grade 3 mathematics")
+        for category_level in CompetitionLevel.objects.all():
+            category_divisions = CompetitionDivision.objects.filter(
+                level=category_level,
+                grade=category_level.min_grade,
+            ).select_related("season")
+            for category_division in category_divisions:
+                if not Syllabus.objects.filter(
+                    division__season=category_division.season,
+                    division__level=category_level,
+                ).exists():
+                    Syllabus.objects.create(
+                        division=category_division,
+                        title=f"{category_level.name} existing syllabus",
+                    )
+        empty_form_page = self.client.get(reverse("cms-syllabus-create"))
+        self.assertContains(empty_form_page, "CMS Test Ecolier — Grades 3–4")
+        self.assertContains(empty_form_page, "Already added")
+        self.assertContains(
+            empty_form_page,
+            reverse("cms-syllabus-edit", args=[syllabus.pk]),
+        )
+        self.assertNotContains(empty_form_page, "data-category-option")
+        self.assertContains(
+            self.client.get(reverse("cms-syllabus-edit", args=[syllabus.pk])),
+            "CMS Test Ecolier — Grades 3–4",
+        )
+        public_page = self.client.get(reverse("syllabus"))
+        self.assertContains(public_page, "Grade 3 mathematics")
+        self.assertContains(public_page, "Topics to explore")
+        self.assertContains(public_page, "Patterns")
+        self.assertContains(public_page, "Explore repeating patterns.")
 
     def test_content_editor_group_includes_the_new_frontend_management_permissions(self):
         editor = Group.objects.get(name="Content Editor")

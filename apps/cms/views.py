@@ -555,6 +555,7 @@ def syllabus_edit(request, instance):
             "topic_formset": topic_formset,
             "creating": creating,
             "can_publish": request.user.has_perm("competitions.publish_syllabus"),
+            "can_edit_syllabuses": request.user.has_perm("competitions.change_syllabus"),
         },
     )
 

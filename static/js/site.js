@@ -288,6 +288,87 @@
     });
   });
 
+  document.querySelectorAll("[data-syllabus-category-picker]").forEach((picker) => {
+    const select = picker.querySelector("select");
+    const trigger = picker.querySelector("[data-category-trigger]");
+    const valueLabel = picker.querySelector("[data-category-value]");
+    const menu = picker.querySelector("[data-category-menu]");
+    const options = [...picker.querySelectorAll("[data-category-option]")];
+    if (!select || !trigger || !valueLabel || !menu) return;
+
+    const updateSelection = () => {
+      const selectedOption = select.selectedOptions[0];
+      valueLabel.textContent = selectedOption?.textContent.trim() || "Choose a competition category";
+      options.forEach((option) => {
+        option.setAttribute("aria-checked", String(option.dataset.value === select.value));
+      });
+    };
+    const closeMenu = (restoreFocus = false) => {
+      menu.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      if (restoreFocus) trigger.focus();
+    };
+    const openMenu = (focusOption = false) => {
+      menu.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      if (focusOption) (options.find((option) => option.dataset.value === select.value) || options[0])?.focus();
+    };
+
+    select.hidden = true;
+    updateSelection();
+    picker.addEventListener("pointerenter", () => openMenu());
+    picker.addEventListener("pointerleave", () => {
+      if (!picker.contains(document.activeElement)) closeMenu();
+    });
+    trigger.addEventListener("focus", () => openMenu());
+    trigger.addEventListener("click", () => openMenu());
+    trigger.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openMenu(true);
+      }
+    });
+    options.forEach((option) => {
+      option.addEventListener("click", () => {
+        select.value = option.dataset.value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        updateSelection();
+        closeMenu(true);
+      });
+    });
+    menu.addEventListener("keydown", (event) => {
+      if (!options.length) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeMenu(true);
+        }
+        return;
+      }
+      const currentIndex = options.indexOf(document.activeElement);
+      let nextIndex;
+      if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % options.length;
+      if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + options.length) % options.length;
+      if (event.key === "Home") nextIndex = 0;
+      if (event.key === "End") nextIndex = options.length - 1;
+      if (nextIndex !== undefined && options.length) {
+        event.preventDefault();
+        options[nextIndex].focus();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu(true);
+      } else if (event.key === "Tab") {
+        closeMenu();
+      }
+    });
+    picker.addEventListener("focusout", (event) => {
+      if (!picker.contains(event.relatedTarget)) closeMenu();
+    });
+    document.addEventListener("pointerdown", (event) => {
+      if (!picker.contains(event.target)) closeMenu();
+    });
+    select.addEventListener("change", updateSelection);
+  });
+
   document.querySelectorAll("[data-image-formset]").forEach((form) => {
     const list = form.querySelector("[data-image-list]");
     const template = form.querySelector("template[data-image-empty-form]");

@@ -1,7 +1,7 @@
 from django import forms
 from django.core.files.uploadedfile import UploadedFile
 from django.forms import inlineformset_factory
-from django.db.models import Q
+from django.db.models import F, Q
 
 from apps.competitions.models import CompetitionDivision, Syllabus, SyllabusTopic
 from .content_sanitizer import sanitize_about_content
@@ -208,14 +208,96 @@ class SyllabusForm(StyledModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        divisions = CompetitionDivision.objects.select_related("season", "level").order_by(
-            "-season__year", "level__display_order", "grade"
-        )
+        divisions = CompetitionDivision.objects.select_related("season", "level").filter(
+            Q(grade=F("level__min_grade"))
+        ).order_by("-season__year", "level__display_order")
+        current_category = None
         if self.instance.pk:
-            divisions = divisions.filter(Q(syllabus__isnull=True) | Q(pk=self.instance.division_id))
-        else:
-            divisions = divisions.filter(syllabus__isnull=True)
-        self.fields["division"].queryset = divisions
+            current_category = (
+                self.instance.division.season_id,
+                self.instance.division.level_id,
+            )
+            divisions = CompetitionDivision.objects.select_related("season", "level").filter(
+                Q(grade=F("level__min_grade")) | Q(pk=self.instance.division_id)
+            ).order_by("-season__year", "level__display_order")
+
+        divisions = list(divisions)
+        occupied_categories = set(
+            Syllabus.objects.exclude(pk=self.instance.pk).values_list(
+                "division__season_id",
+                "division__level_id",
+            )
+        )
+        divisions = [
+            division
+            for division in divisions
+            if (
+                (division.season_id, division.level_id) == current_category
+                or (division.season_id, division.level_id) not in occupied_categories
+            )
+        ]
+        division_field = self.fields["division"]
+        division_field.label = "Competition category"
+        division_field.help_text = "Each category combines two grades. Choose the category for this syllabus."
+        division_field.widget.attrs["hidden"] = True
+        division_field.queryset = CompetitionDivision.objects.filter(
+            pk__in=[division.pk for division in divisions]
+        )
+
+        self.category_choice_groups = []
+        for division in divisions:
+            season_group = next(
+                (
+                    group for group in self.category_choice_groups
+                    if group["label"] == division.season.name
+                ),
+                None,
+            )
+            if season_group is None:
+                season_group = {"label": division.season.name, "options": []}
+                self.category_choice_groups.append(season_group)
+            season_group["options"].append(
+                (
+                    division.pk,
+                    f"{division.level.name} — Grades "
+                    f"{division.level.min_grade}–{division.level.max_grade}",
+                )
+            )
+        division_field.choices = [
+            ("", "Choose a competition category"),
+            *[
+                (group["label"], group["options"])
+                for group in self.category_choice_groups
+            ],
+        ]
+
+        self.existing_category_groups = []
+        existing_syllabuses = Syllabus.objects.exclude(pk=self.instance.pk).select_related(
+            "division__season",
+            "division__level",
+        ).order_by("-division__season__year", "division__level__display_order")
+        for syllabus in existing_syllabuses:
+            season_name = syllabus.division.season.name
+            season_group = next(
+                (
+                    group for group in self.existing_category_groups
+                    if group["label"] == season_name
+                ),
+                None,
+            )
+            if season_group is None:
+                season_group = {"label": season_name, "syllabuses": []}
+                self.existing_category_groups.append(season_group)
+            season_group["syllabuses"].append(
+                {
+                    "syllabus": syllabus,
+                    "category_label": (
+                        f"{syllabus.division.level.name} — Grades "
+                        f"{syllabus.division.level.min_grade}–"
+                        f"{syllabus.division.level.max_grade}"
+                    ),
+                }
+            )
 
 
 class SyllabusTopicForm(StyledModelForm):
