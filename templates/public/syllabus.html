@@ -52,13 +52,13 @@
          data-syllabus-panel="{{ section.level.pk }}"
          {% if not forloop.first %}hidden{% endif %}>
       {% if section.syllabuses %}
-        <div class="syllabus-category-heading">
+        {% comment %} <div class="syllabus-category-heading">
           <div>
             <span class="eyebrow">Competition category</span>
             <h2>{{ section.level.name }} <span>Grades {{ section.level.min_grade }}–{{ section.level.max_grade }}</span></h2>
           </div>
           <i class="bi bi-stars" aria-hidden="true"></i>
-        </div>
+        </div> {% endcomment %}
         <div class="syllabus-grid">
           {% for syllabus in section.syllabuses %}
             <article class="syllabus-card" style="--card-index: {{ forloop.counter0 }}">

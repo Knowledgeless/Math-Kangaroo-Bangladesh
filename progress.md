@@ -2,6 +2,18 @@
 
 Last updated: 2026-11-04
 
+## Completed work — locally bundled site typography
+
+- Downloaded and bundled the Bricolage Grotesque variable font (weights 200–800) and all nine Poppins weights (100–900), with both SIL Open Font Licenses.
+- Removed the remote Google Fonts dependency and configured local `@font-face` declarations so headings/navigation use Bricolage Grotesque and body text/controls use Poppins.
+- Verified local static-file resolution, Django checks, and browser-computed body, heading, and navigation fonts; confirmed the browser loads both font families from `/static/fonts/`.
+
+## Completed work — sitewide typography refresh
+
+- Added Bricolage Grotesque for headings and primary navigation and Poppins for body copy and controls, loaded through the shared base template.
+- Tuned the shared heading scale and body line-height for the updated typefaces without changing light or dark theme colors.
+- Confirmed both font families are available; Django system checks and `git diff --check` pass.
+
 ## Completed work — CMS category dropdown visibility and styling
 
 - Added a custom category picker that opens on hover, focus, or click, with keyboard selection, styled season groups, and a visible selected-category label.
