@@ -65,7 +65,7 @@
       {% if institute_rows %}<div class="registration-bars">{% for row in institute_rows %}<div class="registration-bar-row"><span title="{{ row.label }}">{{ row.label }}</span><div><i style="width: {{ row.bar_width }}%; --bar-color: {{ row.color }}"></i></div><strong>{{ row.total }}</strong></div>{% endfor %}</div>{% else %}<p class="stats-empty">No institution names recorded yet.</p>{% endif %}
     </article>
     <article class="registration-chart-card stats-data-note">
-      <div><span class="eyebrow">Data availability</span><h2>Breakdowns not collected</h2><p>Gender and upazila figures are not shown because the current registration profile does not collect those fields. This avoids presenting guessed or misleading statistics.</p></div>
+      <div><span class="eyebrow">Data availability</span><h2>Additional breakdowns</h2><p>Gender is not collected. Upazila is collected during signup but is not included in these breakdowns yet.</p></div>
     </article>
   </div>
 </section>

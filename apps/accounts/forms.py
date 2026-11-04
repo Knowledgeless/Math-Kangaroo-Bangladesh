@@ -4,6 +4,7 @@ from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from .locations import get_bangladesh_locations
 from .models import StudentProfile, User
 
 
@@ -42,7 +43,9 @@ class StudentSignupForm(StyledForm):
     phone = forms.CharField(max_length=24, required=False, label="Student phone (optional)")
     guardian_name = forms.CharField(max_length=150, label="Parent or guardian name")
     guardian_phone = forms.CharField(max_length=24, label="Parent or guardian phone")
-    district = forms.CharField(max_length=100, required=False, label="District (optional)")
+    division = forms.ChoiceField(choices=(), label="Division")
+    district = forms.ChoiceField(choices=(("", "Choose a district"),), label="District")
+    upazila = forms.ChoiceField(choices=(("", "Choose an upazila"),), label="Upazila")
     school_name = forms.CharField(max_length=180, label="School name")
     grade = forms.TypedChoiceField(choices=GRADE_CHOICES, coerce=int, label="Current grade")
     password1 = forms.CharField(
@@ -55,6 +58,33 @@ class StudentSignupForm(StyledForm):
         strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        locations = get_bangladesh_locations()
+        self.fields["division"].choices = [("", "Choose a division")] + [
+            (division["name"], division["name"]) for division in locations
+        ]
+
+        selected_division = self.data.get("division", self.initial.get("division", ""))
+        division_data = next(
+            (division for division in locations if division["name"] == selected_division),
+            None,
+        )
+        if division_data:
+            districts = division_data["districts"]
+            self.fields["district"].choices = [("", "Choose a district")] + [
+                (district["name"], district["name"]) for district in districts
+            ]
+            selected_district = self.data.get("district", self.initial.get("district", ""))
+            district_data = next(
+                (district for district in districts if district["name"] == selected_district),
+                None,
+            )
+            if district_data:
+                self.fields["upazila"].choices = [("", "Choose an upazila")] + [
+                    (upazila, upazila) for upazila in district_data["upazilas"]
+                ]
 
     def clean_date_of_birth(self):
         date_of_birth = self.cleaned_data["date_of_birth"]

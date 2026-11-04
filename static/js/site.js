@@ -1,4 +1,51 @@
 (() => {
+  const locationForm = document.querySelector("[data-location-form]");
+  if (locationForm) {
+    const dataElement = document.getElementById("bangladesh-locations-data");
+    const divisionSelect = locationForm.querySelector('[name="division"]');
+    const districtSelect = locationForm.querySelector('[name="district"]');
+    const upazilaSelect = locationForm.querySelector('[name="upazila"]');
+    if (dataElement && divisionSelect && districtSelect && upazilaSelect) {
+      const divisions = JSON.parse(dataElement.textContent);
+      const fillSelect = (select, placeholder, values, selectedValue = "") => {
+        select.replaceChildren(new Option(placeholder, ""));
+        values.forEach((value) => select.add(new Option(value, value)));
+        select.value = values.includes(selectedValue) ? selectedValue : "";
+        select.disabled = values.length === 0;
+      };
+      const findDivision = () => divisions.find(
+        (division) => division.name === divisionSelect.value,
+      );
+      const findDistrict = () => findDivision()?.districts.find(
+        (district) => district.name === districtSelect.value,
+      );
+      const updateUpazilas = (selectedUpazila = "") => {
+        fillSelect(
+          upazilaSelect,
+          "Choose an upazila",
+          findDistrict()?.upazilas || [],
+          selectedUpazila,
+        );
+      };
+      const updateDistricts = (selectedDistrict = "", selectedUpazila = "") => {
+        const districts = findDivision()?.districts || [];
+        fillSelect(
+          districtSelect,
+          "Choose a district",
+          districts.map((district) => district.name),
+          selectedDistrict,
+        );
+        updateUpazilas(selectedUpazila);
+      };
+
+      const selectedDistrict = districtSelect.value;
+      const selectedUpazila = upazilaSelect.value;
+      divisionSelect.addEventListener("change", () => updateDistricts());
+      districtSelect.addEventListener("change", () => updateUpazilas());
+      updateDistricts(selectedDistrict, selectedUpazila);
+    }
+  }
+
   document.querySelectorAll("[data-rich-text-editor]").forEach((wrapper) => {
     const source = wrapper.querySelector("textarea");
     const canvas = wrapper.querySelector("[data-editor-canvas]");

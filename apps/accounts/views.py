@@ -23,6 +23,7 @@ from .forms import (
     StudentProfileForm,
     StudentSignupForm,
 )
+from .locations import get_bangladesh_locations
 from .models import StudentProfile, User
 
 
@@ -62,7 +63,9 @@ def signup(request):
                         phone=form.cleaned_data["phone"],
                         guardian_name=form.cleaned_data["guardian_name"],
                         guardian_phone=form.cleaned_data["guardian_phone"],
+                        division=form.cleaned_data["division"],
                         district=form.cleaned_data["district"],
+                        upazila=form.cleaned_data["upazila"],
                     )
             except ValidationError as error:
                 form.add_error(None, error)
@@ -79,7 +82,12 @@ def signup(request):
     return render(
         request,
         "accounts/signup.html",
-        {"form": form, "season": season, "can_register": can_register},
+        {
+            "form": form,
+            "season": season,
+            "can_register": can_register,
+            "locations": get_bangladesh_locations(),
+        },
     )
 
 

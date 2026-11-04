@@ -25,6 +25,27 @@ class AccountFlowTests(TestCase):
         self.assertIn('data-custom-date-picker="true"', date_input)
         self.assertIn('placeholder="YYYY-MM-DD"', date_input)
 
+    def test_signup_location_choices_must_follow_the_selected_parent(self):
+        form = StudentSignupForm(
+            data={
+                "division": "Dhaka",
+                "district": "Khulna",
+                "upazila": "Khulna Sadar",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("district", form.errors)
+        self.assertIn("upazila", form.errors)
+
+    def test_signup_renders_location_selects_and_their_data(self):
+        response = self.client.get(reverse("accounts:signup"))
+
+        self.assertContains(response, 'name="division"')
+        self.assertContains(response, 'name="district"')
+        self.assertContains(response, 'name="upazila"')
+        self.assertContains(response, 'id="bangladesh-locations-data"')
+
     def test_all_message_levels_render_with_their_toast_types(self):
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
@@ -56,7 +77,9 @@ class AccountFlowTests(TestCase):
                 "phone": "",
                 "guardian_name": "Nadia Rahman",
                 "guardian_phone": "01700000000",
+                "division": "Dhaka",
                 "district": "Dhaka",
+                "upazila": "Dhamrai",
                 "school_name": "Dhaka Model School",
                 "grade": "5",
                 "password1": STRONG_PASSWORD,
@@ -70,6 +93,9 @@ class AccountFlowTests(TestCase):
         self.assertEqual(user.role, User.Role.STUDENT)
         self.assertTrue(user.check_password(STRONG_PASSWORD))
         self.assertEqual(user.student_profile.date_of_birth.isoformat(), "2015-03-10")
+        self.assertEqual(user.student_profile.division, "Dhaka")
+        self.assertEqual(user.student_profile.district, "Dhaka")
+        self.assertEqual(user.student_profile.upazila, "Dhamrai")
         registration = CompetitionRegistration.objects.get(student=user)
         self.assertEqual(registration.registration_number, "2700001")
         self.assertEqual(registration.season.year, 2027)
@@ -115,6 +141,9 @@ class AccountFlowTests(TestCase):
                 "date_of_birth": "2016-03-10",
                 "guardian_name": "Nadia Rahman",
                 "guardian_phone": "01700000000",
+                "division": "Dhaka",
+                "district": "Dhaka",
+                "upazila": "Dhamrai",
                 "school_name": "Dhaka Model School",
                 "grade": "4",
                 "password1": STRONG_PASSWORD,

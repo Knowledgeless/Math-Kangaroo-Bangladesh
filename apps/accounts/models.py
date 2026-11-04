@@ -68,7 +68,9 @@ class StudentProfile(models.Model):
     phone = models.CharField(max_length=24, blank=True)
     guardian_name = models.CharField(max_length=150, blank=True)
     guardian_phone = models.CharField(max_length=24, blank=True)
+    division = models.CharField(max_length=100, blank=True)
     district = models.CharField(max_length=100, blank=True)
+    upazila = models.CharField(max_length=100, blank=True)
     grade = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
