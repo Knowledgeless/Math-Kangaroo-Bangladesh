@@ -1,20 +1,75 @@
 import os
+from email.utils import parseaddr
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in {"1", "true", "yes"}
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+
+# --- Environment -----------------------------------------------------------
+# Values come from the process environment first. A .env file in the project
+# root (or the file named by DJANGO_ENV_FILE) fills in anything not already
+# set, so cPanel "Setup Python App" variables always win over the file, and
+# management commands run from the cPanel Terminal see the same configuration
+# as the Passenger web process.
+
+ENV_FILE = Path(os.environ.get("DJANGO_ENV_FILE") or BASE_DIR / ".env")
+if ENV_FILE.is_file():
+    from dotenv import load_dotenv
+
+    load_dotenv(ENV_FILE, override=False)
+
+
+def env(name, default=""):
+    value = os.environ.get(name)
+    return default if value is None or not value.strip() else value.strip()
+
+
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_int(name, default):
+    value = env(name)
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError as error:
+        raise ImproperlyConfigured(f"{name} must be a whole number; got {value!r}.") from error
+
+
+def env_list(name, default=""):
+    return [item.strip() for item in env(name, default).split(",") if item.strip()]
+
+
+def env_path(name, default):
+    value = env(name)
+    return Path(value).expanduser().resolve() if value else default
+
+
+# --- Core ------------------------------------------------------------------
+
+# Local development defaults to DEBUG. passenger_wsgi.py (the cPanel entry
+# point) and deploy/cpanel/deploy.sh set DJANGO_DEBUG_DEFAULT=false, so the
+# live site fails safe to production mode when DJANGO_DEBUG is not set.
+DEBUG = env_bool("DJANGO_DEBUG", env_bool("DJANGO_DEBUG_DEFAULT", True))
+SECRET_KEY = env("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     if not DEBUG:
-        raise RuntimeError("DJANGO_SECRET_KEY must be configured when DEBUG is disabled.")
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be configured when DEBUG is disabled.")
     SECRET_KEY = "development-only-not-for-production"
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
-    if host.strip()
-]
+if not DEBUG and not env("DJANGO_ALLOWED_HOSTS"):
+    raise ImproperlyConfigured(
+        "DJANGO_ALLOWED_HOSTS must list the production domain(s) when DEBUG is disabled."
+    )
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]")
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -39,6 +94,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+if not DEBUG:
+    # Serves collected static files when the web server does not (runserver
+    # already serves them in development).
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'MathKangaroo.urls'
 
@@ -60,28 +119,71 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'MathKangaroo.wsgi.application'
 
-if os.environ.get("DB_ENGINE", "").lower() == "postgresql":
+
+# --- Database --------------------------------------------------------------
+# PostgreSQL is the production database. MySQL/MariaDB is accepted only as a
+# fallback for cPanel hosts that do not offer PostgreSQL (see
+# deploy/cpanel/README.md for the caveats). SQLite is for local development.
+
+DB_ENGINE = env("DB_ENGINE", "sqlite").lower()
+DB_CONN_MAX_AGE = env_int("DB_CONN_MAX_AGE", 60)
+
+if DB_ENGINE in {"postgresql", "postgres"}:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get("DB_NAME", "mathkangaroo"),
-            "USER": os.environ.get("DB_USER", ""),
+            "NAME": env("DB_NAME", "mathkangaroo"),
+            "USER": env("DB_USER"),
             "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-            "HOST": os.environ.get("DB_HOST", "localhost"),
-            "PORT": os.environ.get("DB_PORT", "5432"),
-            "CONN_MAX_AGE": 60,
+            "HOST": env("DB_HOST", "localhost"),
+            "PORT": env("DB_PORT", "5432"),
+            "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+            "CONN_HEALTH_CHECKS": True,
         }
     }
-else:
+elif DB_ENGINE in {"mysql", "mariadb"}:
+    try:
+        import MySQLdb  # noqa: F401  (mysqlclient, when the host can build it)
+    except ImportError:
+        import pymysql
+
+        pymysql.install_as_MySQLdb()
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": env("DB_NAME", "mathkangaroo"),
+            "USER": env("DB_USER"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+            "HOST": env("DB_HOST", "localhost"),
+            "PORT": env("DB_PORT", "3306"),
+            "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+            "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": {
+                "charset": "utf8mb4",
+                "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            },
+        }
+    }
+elif DB_ENGINE in {"sqlite", "sqlite3"}:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+else:
+    raise ImproperlyConfigured(
+        f"DB_ENGINE must be postgresql, mysql or sqlite; got {DB_ENGINE!r}."
+    )
 
 if not DEBUG and DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
-    raise RuntimeError("Production deployments must configure PostgreSQL with DB_ENGINE=postgresql.")
+    raise ImproperlyConfigured(
+        "Production deployments must use DB_ENGINE=postgresql "
+        "(or DB_ENGINE=mysql where the host offers only MySQL/MariaDB)."
+    )
+
+
+# --- Authentication --------------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -102,16 +204,29 @@ AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "accounts:dashboard"
 LOGOUT_REDIRECT_URL = "home"
-EMAIL_BACKEND = os.environ.get(
+
+
+# --- Email -----------------------------------------------------------------
+# cPanel mailboxes usually use port 465 with SSL or port 587 with STARTTLS.
+
+EMAIL_BACKEND = env(
     "DJANGO_EMAIL_BACKEND",
     "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend",
 )
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST = env("EMAIL_HOST")
+EMAIL_PORT = env_int("EMAIL_PORT", 587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in {"1", "true", "yes"}
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Math Kangaroo Bangladesh <no-reply@mathkangaroo.bd>")
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", not EMAIL_USE_SSL)
+EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 20)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Math Kangaroo Bangladesh <no-reply@mathkangaroo.bd>")
+SERVER_EMAIL = env("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+# Comma-separated "Name <email>" entries that receive server-error emails.
+ADMINS = [parseaddr(entry) for entry in env_list("DJANGO_ADMINS") if "@" in parseaddr(entry)[1]]
+
+
+# --- Internationalization --------------------------------------------------
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Dhaka'
@@ -120,11 +235,52 @@ USE_I18N = True
 
 USE_TZ = True
 
+
+# --- Static files and uploads ----------------------------------------------
+# On cPanel, point DJANGO_STATIC_ROOT and DJANGO_MEDIA_ROOT inside the domain's
+# document root (for example ~/public_html/static and ~/public_html/media) so
+# Apache/LiteSpeed serves them directly. WhiteNoise serves STATIC_ROOT as a
+# fallback. DJANGO_PRIVATE_MEDIA_ROOT holds files that must only be served by
+# permission-checking views (question-paper PDFs); it must stay outside any
+# web-served directory.
+
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = env_path("DJANGO_STATIC_ROOT", BASE_DIR / "staticfiles")
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = env_path("DJANGO_MEDIA_ROOT", BASE_DIR / "media")
+PRIVATE_MEDIA_ROOT = env_path("DJANGO_PRIVATE_MEDIA_ROOT", BASE_DIR / "private_media")
+
+_private_media = Path(PRIVATE_MEDIA_ROOT).resolve()
+for _public_root in (Path(MEDIA_ROOT).resolve(), Path(STATIC_ROOT).resolve()):
+    if _private_media == _public_root or _public_root in _private_media.parents:
+        raise ImproperlyConfigured(
+            "DJANGO_PRIVATE_MEDIA_ROOT must not be inside DJANGO_MEDIA_ROOT or DJANGO_STATIC_ROOT."
+        )
+if "public_html" in _private_media.parts:
+    raise ImproperlyConfigured(
+        "DJANGO_PRIVATE_MEDIA_ROOT must be outside public_html; files there can be downloaded directly."
+    )
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if DEBUG
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
+    },
+}
+
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+# Uploads larger than 2.5 MB are buffered to disk; shared hosts often have a
+# small /tmp, so allow a directory inside the account instead.
+FILE_UPLOAD_TEMP_DIR = env("DJANGO_FILE_UPLOAD_TEMP_DIR") or None
+
+
+# --- Security --------------------------------------------------------------
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
@@ -132,12 +288,60 @@ X_FRAME_OPTIONS = "DENY"
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31_536_000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Passenger reports HTTPS to Django directly. Turn the redirect off only if
+    # the host loops on redirects; the .htaccess template also forces HTTPS.
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
+    SECURE_HSTS_SECONDS = env_int("DJANGO_SECURE_HSTS_SECONDS", 31_536_000)
+    # Subdomain/preload HSTS also binds every other subdomain on the domain
+    # (webmail, cpanel, other sites), so they are opt-in.
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+    SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
+    # Trust X-Forwarded-Proto only behind a proxy that always sets it
+    # (for example Cloudflare). A direct cPanel host must leave this off.
+    if env_bool("DJANGO_SECURE_PROXY_SSL_HEADER", False):
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+
+# --- Logging ---------------------------------------------------------------
+# Production logs go to stderr, which Passenger writes to the application's
+# log (cPanel: stderr.log in the application root, or the "Passenger log file"
+# set in Setup Python App), and optionally to DJANGO_LOG_FILE. Server errors
+# are also emailed to DJANGO_ADMINS when it is set.
+
+if not DEBUG:
+    LOG_LEVEL = env("DJANGO_LOG_LEVEL", "INFO").upper()
+    LOG_FILE = env("DJANGO_LOG_FILE")
+    _log_handlers = ["console", "mail_admins"]
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
+        "formatters": {
+            "verbose": {"format": "{asctime} {levelname} {name} {process:d} {message}", "style": "{"},
+        },
+        "handlers": {
+            "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+            "mail_admins": {
+                "class": "django.utils.log.AdminEmailHandler",
+                "level": "ERROR",
+                "filters": ["require_debug_false"],
+            },
+        },
+        "root": {"handlers": ["console"], "level": "WARNING"},
+        "loggers": {
+            "django": {"handlers": _log_handlers, "level": LOG_LEVEL, "propagate": False},
+        },
+    }
+    if LOG_FILE:
+        Path(LOG_FILE).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        LOGGING["handlers"]["file"] = {
+            "class": "logging.handlers.WatchedFileHandler",
+            "filename": str(Path(LOG_FILE).expanduser()),
+            "formatter": "verbose",
+        }
+        LOGGING["root"]["handlers"].append("file")
+        _log_handlers.append("file")
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

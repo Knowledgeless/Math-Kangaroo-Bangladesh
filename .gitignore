@@ -9,3 +9,7 @@ media/
 .pytest_cache/
 .coverage
 htmlcov/
+private_media/
+logs/
+tmp/
+stderr.log

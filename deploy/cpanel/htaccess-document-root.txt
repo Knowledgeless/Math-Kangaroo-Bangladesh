@@ -1,0 +1,29 @@
+# BEGIN Math Kangaroo Bangladesh
+# Paste this block into the .htaccess file in the domain's document root
+# (usually ~/public_html/.htaccess). Keep it OUTSIDE the
+# "DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION" block that cPanel writes.
+
+# No directory listings (in particular /static/ and /media/).
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Send plain-HTTP requests to HTTPS. Django redirects its own pages, but
+    # /static/ and /media/ files are answered by the web server directly.
+    # cPanel AutoSSL validates certificates over HTTP under /.well-known/.
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+    # Refuse hidden files such as .env or .git (but keep /.well-known/).
+    RewriteRule (^|/)\.(?!well-known(/|$)) - [F,L]
+</IfModule>
+
+# Source code, databases, logs and dumps never belong in the document root;
+# refuse them if one is ever copied here by mistake.
+<FilesMatch "(?i)\.(py|pyc|sqlite3?|log|sh|ini|cfg|env|bak|sql|dump)$">
+    Require all denied
+</FilesMatch>
+# END Math Kangaroo Bangladesh

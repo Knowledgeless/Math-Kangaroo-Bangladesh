@@ -163,6 +163,8 @@ class QuestionPaperForm(StyledModelForm):
         label="Question PDF",
         required=False,
         help_text="Upload a PDF file no larger than 20 MB.",
+        # The template names the current file; private PDFs have no URL to link to.
+        widget=forms.FileInput(attrs={"accept": "application/pdf,.pdf"}),
     )
 
     class Meta:

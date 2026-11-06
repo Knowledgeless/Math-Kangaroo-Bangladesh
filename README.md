@@ -4,7 +4,7 @@ A server-rendered Django competition website foundation with a custom public fro
 
 ## Run locally
 
-Use Python 3.13 or newer with Django 5.2.
+Use Python 3.10 or newer (3.12+ recommended) with Django 5.2.
 
 ```bash
 python -m venv .venv
@@ -15,23 +15,17 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-The local development default is SQLite. Production requires PostgreSQL and explicit environment configuration:
+The local development default is SQLite with `DEBUG` on; no `.env` file is needed. Settings are read from environment variables, and a `.env` file in the project root (see `.env.example`) fills in anything not already set.
 
-```text
-DJANGO_DEBUG=false
-DJANGO_SECRET_KEY=<secret from the deployment secret manager>
-DJANGO_ALLOWED_HOSTS=your-domain.example
-DB_ENGINE=postgresql
-DB_NAME=...
-DB_USER=...
-DB_PASSWORD=...
-DB_HOST=...
-DB_PORT=5432
-```
+## Deploy
 
-Password reset messages print to the development console. Set the SMTP environment variables and `DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend` to send real email.
+Production runs with `DJANGO_DEBUG=false` and refuses to start without `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` and a PostgreSQL database (`DB_ENGINE=postgresql`; MySQL/MariaDB via `DB_ENGINE=mysql` only where the host has no PostgreSQL).
 
-Uploaded media is served from `MEDIA_ROOT` at `MEDIA_URL` during local development. In production, configure the web server or media storage to serve `MEDIA_URL`; Django's development file server is disabled when `DJANGO_DEBUG=false`.
+For cPanel hosting follow [`deploy/cpanel/README.md`](deploy/cpanel/README.md): it covers the Passenger entry point (`passenger_wsgi.py`), the production `.env` template, `.htaccess` rules, the `deploy.sh` update script, backups and cron jobs.
+
+Static files are collected into `DJANGO_STATIC_ROOT` and served by the web server, with WhiteNoise as a fallback. Public uploads go to `DJANGO_MEDIA_ROOT`. Question-paper PDFs go to `DJANGO_PRIVATE_MEDIA_ROOT`, which must stay outside every web-served folder; they are only downloadable through the publication-checked view. Django's `/media/` fallback view never serves them.
+
+Password reset messages print to the development console. In production set the SMTP variables (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_SSL`/`EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`).
 
 Default staff Groups are synchronized after migrations: **Content Editor**, **Content Publisher**, **Competition Manager** and **Auditor**. Assign users to the least-privileged matching Group through `/admin/`; combine editor and publisher groups only for staff who have explicit publishing authority. The custom content desk lives at `/dashboard/content/`.
 
@@ -55,5 +49,5 @@ The `/admin/` interface is retained as a technical break-glass tool; it is not t
 
 ```bash
 python manage.py check
-python manage.py test apps.accounts.tests apps.cms.tests apps.competitions.tests
+python manage.py test apps.core.tests apps.accounts.tests apps.cms.tests apps.competitions.tests
 ```

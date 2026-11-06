@@ -1,4 +1,5 @@
 from io import BytesIO
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from PIL import Image
@@ -232,7 +233,9 @@ class PublicContentTests(TestCase):
         )
 
     def test_question_papers_filter_and_download_only_published_pdfs(self):
-        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+        with TemporaryDirectory() as media_directory, TemporaryDirectory() as private_directory, override_settings(
+            MEDIA_ROOT=media_directory, PRIVATE_MEDIA_ROOT=private_directory
+        ):
             older = QuestionPaper.objects.create(
                 title="2025 Ecolier Questions",
                 year=2025,
@@ -614,7 +617,9 @@ class NewContentManagementTests(TestCase):
         self.assertNotContains(page, "<script>")
 
     def test_question_pdf_can_be_uploaded_and_published_from_the_content_desk(self):
-        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+        with TemporaryDirectory() as media_directory, TemporaryDirectory() as private_directory, override_settings(
+            MEDIA_ROOT=media_directory, PRIVATE_MEDIA_ROOT=private_directory
+        ):
             self.client.force_login(self.user)
             response = self.client.post(
                 reverse("cms-question-paper-create"),
@@ -717,6 +722,81 @@ class NewContentManagementTests(TestCase):
         self.assertIn("manage_aboutpage", editor_permissions)
         self.assertIn("add_questionpaper", editor_permissions)
         self.assertIn("add_syllabus", editor_permissions)
+
+
+class QuestionPaperPrivateStorageTests(TestCase):
+    """Question PDFs must only be reachable through the publication-checked download view."""
+
+    def setUp(self):
+        media_directory = TemporaryDirectory()
+        private_directory = TemporaryDirectory()
+        storage_settings = override_settings(
+            MEDIA_ROOT=media_directory.name,
+            PRIVATE_MEDIA_ROOT=private_directory.name,
+        )
+        storage_settings.enable()
+        self.addCleanup(media_directory.cleanup)
+        self.addCleanup(private_directory.cleanup)
+        self.addCleanup(storage_settings.disable)
+        self.media_root = Path(media_directory.name)
+        self.private_root = Path(private_directory.name)
+
+    def create_paper(self, status=PublicationStatus.PUBLISHED):
+        return QuestionPaper.objects.create(
+            title="2026 Cadet Questions",
+            year=2026,
+            category="Cadet",
+            pdf_file=SimpleUploadedFile("cadet-2026.pdf", b"%PDF-1.4\ncadet"),
+            status=status,
+        )
+
+    def test_pdf_is_stored_outside_the_public_media_root(self):
+        paper = self.create_paper()
+        stored = Path(paper.pdf_file.path)
+        self.assertTrue(stored.is_file())
+        self.assertIn(self.private_root.resolve(), stored.resolve().parents)
+        self.assertFalse(any(self.media_root.rglob("*.pdf")))
+        with self.assertRaises(ValueError):
+            paper.pdf_file.url
+
+    def test_pdf_is_not_served_from_the_media_url(self):
+        draft = self.create_paper(status=PublicationStatus.DRAFT)
+        self.assertEqual(self.client.get(f"/media/{draft.pdf_file.name}").status_code, 404)
+        self.assertEqual(
+            self.client.get(reverse("question-paper-download", args=[draft.pk])).status_code,
+            404,
+        )
+
+    def test_media_url_refuses_question_papers_left_in_the_public_media_root(self):
+        legacy = self.media_root / "question-papers" / "legacy.pdf"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_bytes(b"%PDF-1.4\nlegacy")
+        public_image = self.media_root / "hero-slides" / "hero.jpg"
+        public_image.parent.mkdir(parents=True)
+        public_image.write_bytes(b"jpeg")
+
+        self.assertEqual(self.client.get("/media/question-papers/legacy.pdf").status_code, 404)
+        self.assertEqual(self.client.get("/media//question-papers/legacy.pdf").status_code, 404)
+        self.assertEqual(self.client.get("/media/./question-papers/legacy.pdf").status_code, 404)
+        self.assertEqual(
+            self.client.get("/media/hero-slides/../question-papers/legacy.pdf").status_code,
+            404,
+        )
+        self.assertEqual(self.client.get("/media/hero-slides/hero.jpg").status_code, 200)
+
+    def test_content_desk_edit_page_renders_for_a_private_pdf(self):
+        paper = self.create_paper()
+        editor = User.objects.create_user(username="pdfeditor", password="test-pass-12345")
+        editor.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="cms",
+                codename__in=("view_questionpaper", "change_questionpaper"),
+            )
+        )
+        self.client.force_login(editor)
+        response = self.client.get(reverse("cms-question-paper-edit", args=[paper.pk]))
+        self.assertContains(response, paper.pdf_file.name)
+        self.assertNotContains(response, "/media/question-papers/")
 
 
 class HeroSlideManagementTests(TestCase):

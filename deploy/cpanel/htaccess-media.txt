@@ -1,0 +1,21 @@
+# Managed by deploy/cpanel/deploy.sh (installed into DJANGO_MEDIA_ROOT). Edits here are overwritten.
+# Do not use RewriteEngine here: it would switch off the document root's
+# HTTPS redirect for this folder.
+
+Options -Indexes
+
+# Uploads are data, never code: refuse anything a server could execute or a
+# browser could open as an active page.
+<FilesMatch "(?i)\.(php[0-9]*|phtml|phar|pht|pl|py|cgi|fcgi|sh|asp|aspx|jsp|shtml|html?|xhtml|svgz?|js|mjs)$">
+    Require all denied
+</FilesMatch>
+
+# Question papers are only served by Django after a publication check. New
+# uploads are stored outside public_html; this also hides copies left here by
+# older installations.
+RedirectMatch 404 "^/media/question-papers(/|$)"
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set Content-Security-Policy "default-src 'none'; img-src 'self'; sandbox"
+</IfModule>

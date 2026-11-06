@@ -5,6 +5,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.storage import PrivateMediaStorage
 from apps.core.validators import validate_safe_link
 
 
@@ -243,8 +244,11 @@ class QuestionPaper(models.Model):
     description = models.CharField(max_length=320, blank=True)
     year = models.PositiveSmallIntegerField(validators=[MinValueValidator(2000), MaxValueValidator(9999)])
     category = models.CharField(max_length=80)
+    # Stored outside MEDIA_ROOT so unpublished papers cannot be fetched by URL;
+    # question_paper_download is the only way to read them.
     pdf_file = models.FileField(
         upload_to="question-papers/",
+        storage=PrivateMediaStorage(),
         validators=[FileExtensionValidator(allowed_extensions=["pdf"])],
     )
     status = models.CharField(max_length=16, choices=PublicationStatus.choices, default=PublicationStatus.DRAFT)
