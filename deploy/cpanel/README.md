@@ -1,9 +1,17 @@
 # Deploying Math Kangaroo Bangladesh on cPanel
 
-This guide puts the site on a cPanel account that has **Setup Python App**
+This guide puts the site at **https://kangaroomathbd.org/** on a cPanel account that has **Setup Python App**
 (CloudLinux Python Selector). Phusion Passenger runs Django. The web server
 (Apache or LiteSpeed) serves static files and public uploads straight from
 the domain's document root. Configuration lives in one `.env` file.
+
+These rules are built into the settings:
+
+- The live site always runs with `DEBUG` off. `passenger_wsgi.py` enforces
+  this whatever `.env` says.
+- `kangaroomathbd.org` and `www.kangaroomathbd.org` are the allowed hosts.
+  The `www` address and plain HTTP both redirect to `https://kangaroomathbd.org/`.
+- Production uses PostgreSQL and refuses to start with any other database.
 
 Files in this folder:
 
@@ -12,7 +20,7 @@ Files in this folder:
 | `production.env.example` | Template for the production `.env` |
 | `deploy.sh` | One-command deploy and update: packages, checks, backup, migrations, static files, restart |
 | `backup.sh` | Database backup, used by `deploy.sh` and by the nightly cron job |
-| `htaccess-document-root.txt` | Block to paste into the document root `.htaccess`: HTTPS redirect, no directory listings |
+| `htaccess-document-root.txt` | Block to paste into the document root `.htaccess`: HTTPS and www redirects, no directory listings |
 | `htaccess-static.txt`, `htaccess-media.txt` | Installed automatically by `deploy.sh` |
 
 The project root also has `passenger_wsgi.py`, the startup file cPanel loads.
@@ -24,16 +32,16 @@ You need:
 - **Setup Python App** in cPanel, offering Python 3.10 or newer. Pick the
   newest version offered; 3.12 or later is recommended.
 - **Terminal** in cPanel, or SSH access.
-- A database: **PostgreSQL Databases** (preferred) or **MySQL Databases**
-  (see [Using MySQL or MariaDB](#using-mysql-or-mariadb)).
-- The domain or subdomain pointing at the account, with a certificate issued.
+- **PostgreSQL Databases** in cPanel. If it is missing, ask the host to
+  enable PostgreSQL for the account; the site does not run on MySQL.
+- `kangaroomathbd.org` and `www.kangaroomathbd.org` pointing at the account,
+  with a certificate covering both.
   Check **cPanel › SSL/TLS Status**; run AutoSSL if needed.
-- A mailbox for outgoing mail, such as `no-reply@your-domain`
+- A mailbox for outgoing mail, `no-reply@kangaroomathbd.org`
   (**cPanel › Email Accounts**).
 
-Deploy at the root of a domain or subdomain, for example
-`https://mathkangaroo.example.org/`. A sub-folder URL such as
-`example.org/kangaroo/` needs extra changes and is not covered here.
+The site runs at the root of the domain. A sub-folder URL such as
+`kangaroomathbd.org/site/` would need extra changes.
 
 ## How the pieces fit
 
@@ -68,13 +76,12 @@ checking that the paper is published. The settings refuse to start if
 
 ### 1. Create the database
 
-**PostgreSQL:** in **cPanel › PostgreSQL Databases**:
+In **cPanel › PostgreSQL Databases**:
 
 1. Create the database `mathkangaroo`. cPanel names it `CPANELUSER_mathkangaroo`.
 2. Create the user `mkweb` with a long generated password. cPanel names it `CPANELUSER_mkweb`.
 3. Add the user to the database and save.
 
-To use MySQL instead, see [Using MySQL or MariaDB](#using-mysql-or-mariadb).
 
 ### 2. Put the code on the server
 
@@ -127,19 +134,22 @@ python -c "import secrets; print(secrets.token_urlsafe(50))"   # copy the output
 ```
 
 Edit `.env` with `nano .env` or the File Manager editor. Replace every value
-in `<angle brackets>` and every `example.org`:
+in `<angle brackets>`. The domain, database type and mail server are
+already filled in.
 
 - `DJANGO_SECRET_KEY`: the generated value. Keep it secret and never reuse it.
-- `DJANGO_ALLOWED_HOSTS`: the domain(s), comma-separated, without `https://`.
-- `DJANGO_CSRF_TRUSTED_ORIGINS`: the same domain(s), with `https://`.
+- `DJANGO_ALLOWED_HOSTS` is already `kangaroomathbd.org,www.kangaroomathbd.org`.
+  Use host names only: `https://kangaroomathbd.org/` there is refused,
+  because Django would reject every request.
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`: the full prefixed names from step 1.
 - `DJANGO_STATIC_ROOT`, `DJANGO_MEDIA_ROOT`: inside the domain's document root.
 - `DJANGO_PRIVATE_MEDIA_ROOT`, `DJANGO_FILE_UPLOAD_TEMP_DIR`, `DJANGO_LOG_FILE`:
   under `/home/CPANELUSER/mathkangaroo-data/`.
-- `EMAIL_*`: copy them from **Email Accounts › Connect Devices** for the
-  mailbox. Port 465 uses `EMAIL_USE_SSL=true`. Port 587 uses
+- `EMAIL_HOST_PASSWORD`: the password of `no-reply@kangaroomathbd.org`. Check
+  the server name and port in **Email Accounts › Connect Devices**. Port 465 uses `EMAIL_USE_SSL=true`. Port 587 uses
   `EMAIL_USE_SSL=false` and `EMAIL_USE_TLS=true`.
-- `DJANGO_ADMINS`: who gets an email when the site hits a server error.
+- `DJANGO_ADMINS` (optional, commented out): who gets an email when the site
+  hits a server error.
 
 `deploy.sh` refuses to run while any `<placeholder>` is left.
 
@@ -153,8 +163,8 @@ in `<angle brackets>` and every `example.org`:
 
 The block:
 
-- redirects HTTP to HTTPS, including static and media files, which never
-  reach Django;
+- sends `www.kangaroomathbd.org` and plain HTTP to `https://kangaroomathbd.org/`,
+  including static and media files, which never reach Django;
 - turns off directory listings;
 - refuses hidden files and source or database files.
 
@@ -189,7 +199,7 @@ The script stops at the first problem and says what to fix. In order, it:
 python manage.py createsuperuser
 ```
 
-Sign in at `https://your-domain/admin/`, then:
+Sign in at `https://kangaroomathbd.org/admin/`, then:
 
 - Create staff accounts and give each one the least-privileged group that
   fits. Migrations create the groups: **Content Editor**, **Content
@@ -200,9 +210,9 @@ Sign in at `https://your-domain/admin/`, then:
 
 Then check the site:
 
-- [ ] `https://your-domain/` loads with styles, fonts and icons.
-- [ ] `http://your-domain/` redirects to `https://`.
-- [ ] `https://your-domain/media/` and `https://your-domain/static/` show
+- [ ] `https://kangaroomathbd.org/` loads with styles, fonts and icons.
+- [ ] `http://kangaroomathbd.org/` redirects to `https://`.
+- [ ] `https://kangaroomathbd.org/media/` and `https://kangaroomathbd.org/static/` show
       "Forbidden", not a file list.
 - [ ] An image uploaded in the content desk (`/dashboard/content/`) appears
       on the public page.
@@ -259,27 +269,12 @@ cd /home/CPANELUSER/mathkangaroo && /home/CPANELUSER/virtualenv/mathkangaroo/3.1
 same server. Download a copy now and then, or rely on the host's off-server
 backups as well. Test a restore at least once:
 
-- PostgreSQL: `pg_restore --no-owner -d <database> <file>.dump`
-- MySQL: `gunzip -c <file>.sql.gz | mysql <database>`
+```bash
+pg_restore --no-owner -d <database> <file>.dump
+```
 
 Back up the uploads too. They are in `public_html/media` and
 `mathkangaroo-data/private_media`.
-
-## Using MySQL or MariaDB
-
-Use MySQL or MariaDB only if the host offers no PostgreSQL. Django 5.2 needs
-MariaDB 10.5+ or MySQL 8.0.11+.
-
-1. Create the database and user in **cPanel › MySQL Databases**, and grant the
-   user **ALL PRIVILEGES** on it.
-2. In `.env`, set `DB_ENGINE=mysql` and `DB_PORT=3306`.
-
-The pure-Python PyMySQL driver in `requirements.txt` is used, so nothing has
-to be compiled.
-
-One limit: MySQL and MariaDB cannot enforce the database rule that only one
-competition season is marked current. `check --deploy` reports this as
-`models.W036`. Make sure only one season is marked current in the admin.
 
 ## Logs
 
@@ -296,12 +291,12 @@ Server errors are also emailed to `DJANGO_ADMINS`.
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | "Web application could not be started", or a 500 on every page | Settings refused to load: a `.env` value is missing or wrong, or a package is missing | Run `python manage.py check --deploy` in the virtualenv and read the error. Check the Passenger log. |
-| "Bad Request (400)" | The domain is not in `DJANGO_ALLOWED_HOSTS` | Add it and restart |
+| "Bad Request (400)" | The address used is not in `DJANGO_ALLOWED_HOSTS` | Use `https://kangaroomathbd.org/`. If you changed `DJANGO_ALLOWED_HOSTS`, list host names only, then restart. |
 | "Too many redirects" | HTTPS is handled by a proxy such as Cloudflare, and Django sees plain HTTP | In Cloudflare, use SSL mode **Full (strict)** and set `DJANGO_SECURE_PROXY_SSL_HEADER=true`. As a last resort, set `DJANGO_SECURE_SSL_REDIRECT=false`; the `.htaccess` block still redirects. |
-| "CSRF verification failed" on forms | The origin is not trusted, or HTTPS is not detected | Put `https://your-domain` in `DJANGO_CSRF_TRUSTED_ORIGINS`. Check the redirect row above. |
+| "CSRF verification failed" on forms | The origin is not trusted, or HTTPS is not detected | Keep `https://kangaroomathbd.org` in `DJANGO_CSRF_TRUSTED_ORIGINS`. Check the redirect row above. |
 | Unstyled pages, or 500 with "Missing staticfiles manifest entry" | Static files were not collected | Run `deploy.sh`. Check that `DJANGO_STATIC_ROOT` is inside the document root. |
 | Uploaded images missing | `DJANGO_MEDIA_ROOT` is wrong, or permissions | It must match the folder under the document root. Folders need 755 and files 644. |
-| `pip` fails building `psycopg` or `Pillow` | Old server OS without matching binary wheels | Pick another Python version in Setup Python App, or ask the host. Use MySQL only if PostgreSQL is the problem. |
+| `pip` fails building `psycopg` or `Pillow` | Old server OS without matching binary wheels | Pick another Python version in Setup Python App, or ask the host. |
 | Large PDF uploads fail | The host's request-size limit, or a missing temp folder | Run `deploy.sh`, which creates `DJANGO_FILE_UPLOAD_TEMP_DIR`. Ask the host about the upload limit; the site accepts PDFs up to 20 MB. |
 | Password-reset email never arrives | SMTP settings, or mail deliverability | Check the `EMAIL_*` values and port/SSL pairing. Fix SPF/DKIM in **cPanel › Email Deliverability**. |
 | A `.env` change has no effect | The app was not restarted | Restart the app, or `touch tmp/restart.txt` |

@@ -66,8 +66,6 @@ class DeploymentSettingsTests(SimpleTestCase):
             "DJANGO_ENV_FILE": str(self.tmp / "missing.env"),
             "DJANGO_DEBUG": "false",
             "DJANGO_SECRET_KEY": "test-only-" + "s" * 50,
-            "DJANGO_ALLOWED_HOSTS": "mathkangaroo.example.org,www.mathkangaroo.example.org",
-            "DB_ENGINE": "postgresql",
             "DB_NAME": "mk_db",
             "DB_USER": "mk_user",
             "DB_PASSWORD": "secret",
@@ -109,9 +107,10 @@ class DeploymentSettingsTests(SimpleTestCase):
     def test_production_settings_are_secure_by_default(self):
         config = self.load_settings()
         self.assertFalse(config["DEBUG"])
+        self.assertEqual(config["ALLOWED_HOSTS"], ["kangaroomathbd.org", "www.kangaroomathbd.org"])
         self.assertEqual(
-            config["ALLOWED_HOSTS"],
-            ["mathkangaroo.example.org", "www.mathkangaroo.example.org"],
+            config["CSRF_TRUSTED_ORIGINS"],
+            ["https://kangaroomathbd.org", "https://www.kangaroomathbd.org"],
         )
         self.assertTrue(config["SECURE_SSL_REDIRECT"])
         self.assertTrue(config["SESSION_COOKIE_SECURE"])
@@ -139,7 +138,8 @@ class DeploymentSettingsTests(SimpleTestCase):
                 "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS": "true",
                 "DJANGO_SECURE_HSTS_PRELOAD": "true",
                 "DJANGO_SECURE_PROXY_SSL_HEADER": "true",
-                "DJANGO_CSRF_TRUSTED_ORIGINS": "https://mathkangaroo.example.org",
+                "DJANGO_ALLOWED_HOSTS": "kangaroomathbd.org",
+                "DJANGO_CSRF_TRUSTED_ORIGINS": "https://kangaroomathbd.org",
             }
         )
         self.assertFalse(config["SECURE_SSL_REDIRECT"])
@@ -147,13 +147,15 @@ class DeploymentSettingsTests(SimpleTestCase):
         self.assertTrue(config["SECURE_HSTS_INCLUDE_SUBDOMAINS"])
         self.assertTrue(config["SECURE_HSTS_PRELOAD"])
         self.assertEqual(config["SECURE_PROXY_SSL_HEADER"], ["HTTP_X_FORWARDED_PROTO", "https"])
-        self.assertEqual(config["CSRF_TRUSTED_ORIGINS"], ["https://mathkangaroo.example.org"])
+        self.assertEqual(config["ALLOWED_HOSTS"], ["kangaroomathbd.org"])
+        self.assertEqual(config["CSRF_TRUSTED_ORIGINS"], ["https://kangaroomathbd.org"])
 
-    def test_production_refuses_missing_secret_hosts_or_sqlite(self):
+    def test_production_refuses_missing_secret_url_hosts_or_non_postgresql(self):
         self.assert_refused("DJANGO_SECRET_KEY", drop=("DJANGO_SECRET_KEY",))
-        self.assert_refused("DJANGO_ALLOWED_HOSTS", drop=("DJANGO_ALLOWED_HOSTS",))
-        self.assert_refused("DB_ENGINE=postgresql", {"DB_ENGINE": "sqlite"})
-        self.assert_refused("DB_ENGINE must be", {"DB_ENGINE": "postgress"})
+        self.assert_refused("not URLs", {"DJANGO_ALLOWED_HOSTS": "https://kangaroomathbd.org/"})
+        self.assert_refused("must use PostgreSQL", {"DB_ENGINE": "sqlite"})
+        self.assert_refused("DB_ENGINE must be postgresql", {"DB_ENGINE": "mysql"})
+        self.assert_refused("DB_ENGINE must be postgresql", {"DB_ENGINE": "postgress"})
         self.assert_refused("whole number", {"DJANGO_SECURE_HSTS_SECONDS": "one year"})
 
     def test_private_media_must_not_be_web_served(self):
@@ -165,14 +167,6 @@ class DeploymentSettingsTests(SimpleTestCase):
             "outside public_html",
             {"DJANGO_PRIVATE_MEDIA_ROOT": str(self.tmp / "public_html" / "private")},
         )
-
-    def test_mysql_fallback_uses_utf8mb4_and_strict_mode(self):
-        config = self.load_settings({"DB_ENGINE": "mysql"})
-        database = config["DATABASE"]
-        self.assertEqual(database["ENGINE"], "django.db.backends.mysql")
-        self.assertEqual(database["PORT"], "3306")
-        self.assertIn("utf8mb4", database["OPTIONS"])
-        self.assertIn("STRICT_TRANS_TABLES", database["OPTIONS"])
 
     def test_cpanel_mail_and_admin_settings(self):
         config = self.load_settings(
@@ -198,7 +192,6 @@ class DeploymentSettingsTests(SimpleTestCase):
         )
         config = self.load_settings(
             {"DJANGO_ENV_FILE": str(env_file), "DJANGO_SECURE_HSTS_SECONDS": "120"},
-            drop=("DJANGO_ALLOWED_HOSTS",),
         )
         self.assertEqual(config["ALLOWED_HOSTS"], ["from-file.example.org"])
         self.assertEqual(config["SECURE_HSTS_SECONDS"], 120)
@@ -211,10 +204,19 @@ class DeploymentSettingsTests(SimpleTestCase):
         self.assertEqual(config["DATABASE"]["ENGINE"], "django.db.backends.sqlite3")
         self.assertNotIn("whitenoise.middleware.WhiteNoiseMiddleware", config["MIDDLEWARE"])
 
-    def test_passenger_entry_point_fails_safe_to_production_mode(self):
+    def test_passenger_entry_point_always_runs_without_debug(self):
         result = self.run_probe(self.production_env, probe=PASSENGER_PROBE, drop=("DJANGO_DEBUG",))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), {"DEBUG": False, "callable": True})
+
+        env_file = self.tmp / ".env"
+        env_file.write_text("DJANGO_DEBUG=true\n", encoding="utf-8")
+        forced = self.run_probe(
+            {**self.production_env, "DJANGO_DEBUG": "true", "DJANGO_ENV_FILE": str(env_file)},
+            probe=PASSENGER_PROBE,
+        )
+        self.assertEqual(forced.returncode, 0, forced.stderr)
+        self.assertEqual(json.loads(forced.stdout), {"DEBUG": False, "callable": True})
 
         missing_secret = self.run_probe(
             self.production_env,

@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "MathKangaroo.settings")
-# The public site never runs in DEBUG unless DJANGO_DEBUG explicitly says so.
-os.environ.setdefault("DJANGO_DEBUG_DEFAULT", "false")
+# The live site never runs with DEBUG, whatever .env or cPanel says.
+os.environ["DJANGO_DEBUG"] = "false"
 
 from MathKangaroo.wsgi import application  # noqa: E402,F401

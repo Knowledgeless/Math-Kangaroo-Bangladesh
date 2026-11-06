@@ -54,22 +54,32 @@ def env_path(name, default):
 
 # --- Core ------------------------------------------------------------------
 
-# Local development defaults to DEBUG. passenger_wsgi.py (the cPanel entry
-# point) and deploy/cpanel/deploy.sh set DJANGO_DEBUG_DEFAULT=false, so the
-# live site fails safe to production mode when DJANGO_DEBUG is not set.
-DEBUG = env_bool("DJANGO_DEBUG", env_bool("DJANGO_DEBUG_DEFAULT", True))
+# Local development runs with DEBUG on. The deploy entry points
+# (passenger_wsgi.py, deploy/cpanel/deploy.sh and backup.sh) force
+# DJANGO_DEBUG=false, so the live site never runs with DEBUG.
+DEBUG = env_bool("DJANGO_DEBUG", True)
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     if not DEBUG:
         raise ImproperlyConfigured("DJANGO_SECRET_KEY must be configured when DEBUG is disabled.")
     SECRET_KEY = "development-only-not-for-production"
 
-if not DEBUG and not env("DJANGO_ALLOWED_HOSTS"):
+# The live site is https://kangaroomathbd.org/ (www redirects there via
+# .htaccess). Set DJANGO_ALLOWED_HOSTS only if the domain changes.
+PRODUCTION_HOSTS = ["kangaroomathbd.org", "www.kangaroomathbd.org"]
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS") or (
+    PRODUCTION_HOSTS if not DEBUG else ["localhost", "127.0.0.1", "[::1]"]
+)
+if any("://" in host or "/" in host for host in ALLOWED_HOSTS):
     raise ImproperlyConfigured(
-        "DJANGO_ALLOWED_HOSTS must list the production domain(s) when DEBUG is disabled."
+        "DJANGO_ALLOWED_HOSTS takes host names such as kangaroomathbd.org, not URLs."
     )
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]")
-CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+# Forms are posted from these origins; defaults to https:// + each host.
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS") or (
+    []
+    if DEBUG
+    else [f"https://{host}" for host in ALLOWED_HOSTS if host != "*" and not host.startswith(".")]
+)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -121,11 +131,10 @@ WSGI_APPLICATION = 'MathKangaroo.wsgi.application'
 
 
 # --- Database --------------------------------------------------------------
-# PostgreSQL is the production database. MySQL/MariaDB is accepted only as a
-# fallback for cPanel hosts that do not offer PostgreSQL (see
-# deploy/cpanel/README.md for the caveats). SQLite is for local development.
+# Production uses PostgreSQL (cPanel > PostgreSQL Databases). SQLite is only
+# for local development; production refuses to start with anything else.
 
-DB_ENGINE = env("DB_ENGINE", "sqlite").lower()
+DB_ENGINE = env("DB_ENGINE", "sqlite" if DEBUG else "postgresql").lower()
 DB_CONN_MAX_AGE = env_int("DB_CONN_MAX_AGE", 60)
 
 if DB_ENGINE in {"postgresql", "postgres"}:
@@ -141,29 +150,6 @@ if DB_ENGINE in {"postgresql", "postgres"}:
             "CONN_HEALTH_CHECKS": True,
         }
     }
-elif DB_ENGINE in {"mysql", "mariadb"}:
-    try:
-        import MySQLdb  # noqa: F401  (mysqlclient, when the host can build it)
-    except ImportError:
-        import pymysql
-
-        pymysql.install_as_MySQLdb()
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.mysql",
-            "NAME": env("DB_NAME", "mathkangaroo"),
-            "USER": env("DB_USER"),
-            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-            "HOST": env("DB_HOST", "localhost"),
-            "PORT": env("DB_PORT", "3306"),
-            "CONN_MAX_AGE": DB_CONN_MAX_AGE,
-            "CONN_HEALTH_CHECKS": True,
-            "OPTIONS": {
-                "charset": "utf8mb4",
-                "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-            },
-        }
-    }
 elif DB_ENGINE in {"sqlite", "sqlite3"}:
     DATABASES = {
         "default": {
@@ -173,14 +159,11 @@ elif DB_ENGINE in {"sqlite", "sqlite3"}:
     }
 else:
     raise ImproperlyConfigured(
-        f"DB_ENGINE must be postgresql, mysql or sqlite; got {DB_ENGINE!r}."
+        f"DB_ENGINE must be postgresql (or sqlite for local development); got {DB_ENGINE!r}."
     )
 
-if not DEBUG and DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
-    raise ImproperlyConfigured(
-        "Production deployments must use DB_ENGINE=postgresql "
-        "(or DB_ENGINE=mysql where the host offers only MySQL/MariaDB)."
-    )
+if not DEBUG and DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql":
+    raise ImproperlyConfigured("Production deployments must use PostgreSQL (DB_ENGINE=postgresql).")
 
 
 # --- Authentication --------------------------------------------------------

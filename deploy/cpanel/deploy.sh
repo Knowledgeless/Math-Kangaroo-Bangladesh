@@ -32,9 +32,9 @@ trap 'fail "deploy stopped at line $LINENO; nothing after that step ran."' ERR
 [[ -n "${VIRTUAL_ENV:-}" ]] || fail "Enter the app's virtualenv first (cPanel > Setup Python App shows the 'source .../bin/activate' command)."
 [[ -f manage.py && -f passenger_wsgi.py ]] || fail "Run this from a checkout of the project ($APP_DIR has no manage.py/passenger_wsgi.py)."
 
-# Same production defaults as passenger_wsgi.py.
+# Production mode, exactly as passenger_wsgi.py runs the live site.
 export DJANGO_SETTINGS_MODULE=MathKangaroo.settings
-export DJANGO_DEBUG_DEFAULT=false
+export DJANGO_DEBUG=false
 
 step "Checking the .env file"
 ENV_FILE="${DJANGO_ENV_FILE:-$APP_DIR/.env}"
@@ -90,7 +90,7 @@ PY
 )" || fail "Django could not load the production settings (see the error above)."
 eval "$config"
 
-[[ "$CFG_DEBUG" == 0 ]] || fail "DEBUG is on. Set DJANGO_DEBUG=false in $ENV_FILE."
+[[ "$CFG_DEBUG" == 0 ]] || fail "DEBUG is on; production must run with DEBUG off."
 echo "Database:       $CFG_ENGINE $CFG_DB_NAME on ${CFG_DB_HOST:-localhost}:$CFG_DB_PORT"
 echo "Static files:   $CFG_STATIC_ROOT"
 echo "Public media:   $CFG_MEDIA_ROOT"
@@ -113,7 +113,7 @@ fi
 if [[ "$pending" == 1 && "${SKIP_BACKUP:-0}" != 1 ]]; then
     step "Backing up the database before migrating"
     PYTHON="$(command -v python)" bash "$TEMPLATE_DIR/backup.sh" \
-        || fail "The backup failed. Back up from cPanel (phpPgAdmin/phpMyAdmin), then rerun with SKIP_BACKUP=1."
+        || fail "The backup failed. Back up from cPanel > phpPgAdmin, then rerun with SKIP_BACKUP=1."
 fi
 
 step "Applying migrations"

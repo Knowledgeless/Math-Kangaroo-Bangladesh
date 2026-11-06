@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Back up the production database (PostgreSQL or MySQL/MariaDB).
+# Back up the production PostgreSQL database.
 #
 # deploy.sh runs this before applying migrations. For a nightly backup add a
 # cPanel cron job (one line; replace CPANELUSER and the Python version):
@@ -23,7 +23,7 @@ fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 [[ "$KEEP_DAYS" =~ ^[0-9]+$ ]] || fail "KEEP_DAYS must be a whole number of days."
 
 export DJANGO_SETTINGS_MODULE=MathKangaroo.settings
-export DJANGO_DEBUG_DEFAULT=false
+export DJANGO_DEBUG=false
 
 config="$("$PYTHON" - <<'PY'
 import shlex
@@ -62,15 +62,6 @@ case "$DB_KIND" in
             --host="$DB_HOST_" --port="$DB_PORT_" --username="$DB_USER_" \
             --file="$backup.partial" "$DB_NAME_"
         ;;
-    mysql)
-        dump_tool="$(command -v mysqldump || command -v mariadb-dump || true)"
-        [[ -n "$dump_tool" ]] \
-            || fail "mysqldump is not available. Export the database from cPanel > phpMyAdmin instead."
-        backup="$BACKUP_DIR/$DB_NAME_-$stamp.sql.gz"
-        MYSQL_PWD="$DB_PASSWORD_" "$dump_tool" --single-transaction --no-tablespaces \
-            --host="$DB_HOST_" --port="$DB_PORT_" --user="$DB_USER_" "$DB_NAME_" \
-            | gzip > "$backup.partial"
-        ;;
     *)
         fail "There is no backup method for the '$DB_KIND' database engine."
         ;;
@@ -80,6 +71,6 @@ echo "Saved $backup"
 
 if [[ "$KEEP_DAYS" != 0 ]]; then
     find "$BACKUP_DIR" -maxdepth 1 -type f \
-        \( -name "$DB_NAME_-*.dump" -o -name "$DB_NAME_-*.sql.gz" -o -name "$DB_NAME_-*.partial" \) \
+        \( -name "$DB_NAME_-*.dump" -o -name "$DB_NAME_-*.partial" \) \
         -mtime +"$KEEP_DAYS" -delete
 fi

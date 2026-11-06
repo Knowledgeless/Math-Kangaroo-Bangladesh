@@ -19,7 +19,7 @@ The local development default is SQLite with `DEBUG` on; no `.env` file is neede
 
 ## Deploy
 
-Production runs with `DJANGO_DEBUG=false` and refuses to start without `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` and a PostgreSQL database (`DB_ENGINE=postgresql`; MySQL/MariaDB via `DB_ENGINE=mysql` only where the host has no PostgreSQL).
+The live site is https://kangaroomathbd.org/. Production always runs with `DEBUG` off (`passenger_wsgi.py` enforces it), accepts the hosts `kangaroomathbd.org` and `www.kangaroomathbd.org`, uses PostgreSQL only, and refuses to start without `DJANGO_SECRET_KEY` and the database credentials.
 
 For cPanel hosting follow [`deploy/cpanel/README.md`](deploy/cpanel/README.md): it covers the Passenger entry point (`passenger_wsgi.py`), the production `.env` template, `.htaccess` rules, the `deploy.sh` update script, backups and cron jobs.
 

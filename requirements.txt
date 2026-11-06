@@ -4,8 +4,5 @@ Pillow>=11.0,<14.0
 python-dotenv>=1.0,<2.0
 # Serves collected static files when the web server does not (production only).
 whitenoise>=6.8,<7.0
-# PostgreSQL driver (DB_ENGINE=postgresql, the production database).
+# PostgreSQL driver (the production database).
 psycopg[binary]>=3.2,<4.0
-# Pure-Python MySQL/MariaDB driver for cPanel hosts without PostgreSQL
-# (DB_ENGINE=mysql). Needs no compiler, unlike mysqlclient.
-PyMySQL>=1.1,<2.0
