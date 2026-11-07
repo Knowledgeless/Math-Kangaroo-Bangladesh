@@ -11,13 +11,16 @@ Options -Indexes
 
     # One canonical address: https://kangaroomathbd.org/ (www and http
     # redirect there in a single step).
-    RewriteCond %{HTTP_HOST} ^www\.kangaroomathbd\.org$ [NC]
+    # Also catches a trailing dot, an explicit port or upper case.
+    RewriteCond %{HTTP_HOST} !^kangaroomathbd\.org$
+    RewriteCond %{HTTP_HOST} ^(www\.)?kangaroomathbd\.org\.?(:[0-9]+)?$ [NC]
     RewriteCond %{REQUEST_URI} !^/\.well-known/
     RewriteRule ^ https://kangaroomathbd.org%{REQUEST_URI} [R=301,L]
 
     # Send plain-HTTP requests to HTTPS. Django redirects its own pages, but
     # /static/ and /media/ files are answered by the web server directly.
     # cPanel AutoSSL validates certificates over HTTP under /.well-known/.
+    # The X-Forwarded-Proto line only matters behind Cloudflare/another proxy.
     RewriteCond %{HTTPS} !=on
     RewriteCond %{HTTP:X-Forwarded-Proto} !=https
     RewriteCond %{REQUEST_URI} !^/\.well-known/

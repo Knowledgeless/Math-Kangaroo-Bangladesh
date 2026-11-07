@@ -1,9 +1,11 @@
 # Deploying Math Kangaroo Bangladesh on cPanel
 
-This guide puts the site at **https://kangaroomathbd.org/** on a cPanel account that has **Setup Python App**
-(CloudLinux Python Selector). Phusion Passenger runs Django. The web server
-(Apache or LiteSpeed) serves static files and public uploads straight from
-the domain's document root. Configuration lives in one `.env` file.
+This guide puts the site at **https://kangaroomathbd.org/** on a cPanel
+account that has **Setup Python App** (CloudLinux Python Selector). Passenger
+runs Django; on LiteSpeed servers, LiteSpeed's Passenger-compatible runner
+does. The web server (Apache or LiteSpeed) serves static files and public
+uploads straight from the domain's document root. Configuration lives in one
+`.env` file.
 
 These rules are built into the settings:
 
@@ -32,8 +34,8 @@ You need:
 - **Setup Python App** in cPanel, offering Python 3.10 or newer. Pick the
   newest version offered; 3.12 or later is recommended.
 - **Terminal** in cPanel, or SSH access.
-- **PostgreSQL Databases** in cPanel. If it is missing, ask the host to
-  enable PostgreSQL for the account; the site does not run on MySQL.
+- **PostgreSQL 14 or newer** in **cPanel › PostgreSQL Databases**. The site
+  does not run on MySQL. See [Check the PostgreSQL version](#check-the-postgresql-version-first).
 - `kangaroomathbd.org` and `www.kangaroomathbd.org` pointing at the account,
   with a certificate covering both.
   Check **cPanel › SSL/TLS Status**; run AutoSSL if needed.
@@ -42,6 +44,41 @@ You need:
 
 The site runs at the root of the domain. A sub-folder URL such as
 `kangaroomathbd.org/site/` would need extra changes.
+
+### Check the PostgreSQL version first
+
+Django 5.2 needs **PostgreSQL 14 or newer**. cPanel uses the PostgreSQL that
+ships with the server's operating system, which is often older:
+
+- AlmaLinux/CloudLinux 8 ships 10.
+- AlmaLinux/CloudLinux 9 ships 13.
+
+To see your server's version, use either:
+
+- **cPanel › phpPgAdmin**, which shows the server version on its first page;
+- or, after step 1, run this in the Terminal and enter the database password:
+
+  ```bash
+  psql -h localhost -U CPANELUSER_mkweb -d CPANELUSER_mathkangaroo -c 'SHOW server_version;'
+  ```
+
+`deploy.sh` also prints the version, and stops with
+"PostgreSQL 14 or later is required" if it is too old.
+
+If the version is below 14, there are two options:
+
+- **Ask the host for PostgreSQL 14 or newer.** Some hosts can install a
+  newer version.
+- **Use an external managed PostgreSQL** (14 or newer). Put its host, port,
+  name, user and password in `.env`, and set `DB_SSLMODE=require`. Ask the
+  host to allow outgoing connections to that server's port, usually 5432;
+  shared hosts often block them.
+
+  The server's own `pg_dump` is then older than the database and cannot back
+  it up. Rely on the provider's automatic backups and run deploys with
+  `SKIP_BACKUP=1`. Alternatively, point `PG_DUMP=` at a `pg_dump` of the same
+  or a newer version, for both `deploy.sh` and the cron job. `backup.sh`
+  checks the versions and says which applies.
 
 ## How the pieces fit
 
@@ -78,10 +115,16 @@ checking that the paper is published. The settings refuse to start if
 
 In **cPanel › PostgreSQL Databases**:
 
-1. Create the database `mathkangaroo`. cPanel names it `CPANELUSER_mathkangaroo`.
-2. Create the user `mkweb` with a long generated password. cPanel names it `CPANELUSER_mkweb`.
+1. Create the database `mathkangaroo`.
+2. Create the user `mkweb` with a long generated password of letters and
+   digits only (24+ characters), so it needs no quoting in `.env`.
 3. Add the user to the database and save.
 
+cPanel adds a prefix to both names. It is usually your username
+(`CPANELUSER_mathkangaroo`), but on some servers only its first 8 characters.
+Copy the exact names from the **Current Databases** and **Current Users**
+lists. This guide writes them as `CPANELUSER_mathkangaroo` and
+`CPANELUSER_mkweb`.
 
 ### 2. Put the code on the server
 
@@ -91,9 +134,21 @@ Use one of these two methods.
 - **Git (recommended):** in **cPanel › Git Version Control › Create**, paste
   the repository's clone URL and set the repository path to
   `/home/CPANELUSER/mathkangaroo`.
-  - For a private GitHub repository, first create a key in **cPanel › SSH
-    Access**, then add its public key to the repository as a read-only
-    deploy key.
+  - A **private** GitHub repository needs a deploy key first. Git Version
+    Control cannot use a key that has a passphrase. Run this in the Terminal:
+
+    ```bash
+    ssh-keygen -t ed25519 -N "" -f ~/.ssh/mathkangaroo_deploy
+    printf 'Host github.com\n  IdentityFile ~/.ssh/mathkangaroo_deploy\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+    chmod 600 ~/.ssh/config
+    cat ~/.ssh/mathkangaroo_deploy.pub
+    ```
+
+    1. On GitHub, add the printed key under the repository's
+       **Settings › Deploy keys**, read-only.
+    2. In Git Version Control, use the SSH clone URL
+       `git@github.com:OWNER/REPOSITORY.git`, not the `https://` one.
+    3. Click **Save and Continue** when asked to trust GitHub's host key.
 - **Upload:** zip the project on your computer and upload it with **File
   Manager**, then extract it into `/home/CPANELUSER/mathkangaroo`. Leave out
   `.venv/`, `.env`, `db.sqlite3`, `media/` and `staticfiles/`.
@@ -179,13 +234,15 @@ The script stops at the first problem and says what to fix. In order, it:
 
 1. checks the `.env` file;
 2. installs `requirements.txt`;
-3. confirms Django loads in production mode and can reach the database
-   (`manage.py check --deploy --database default`);
-4. backs up the database if migrations are pending;
-5. migrates;
-6. creates the upload folders with tight permissions;
-7. collects static files and installs the `static/` and `media/` `.htaccess` rules;
-8. restarts the app and requests the home page.
+3. confirms Django loads in production mode, connects to the database and
+   prints the PostgreSQL version (14+ required);
+4. creates the static, media, private-media, upload-temp and log folders,
+   with the private ones readable only by your account;
+5. runs `manage.py check --deploy`;
+6. backs up the database if migrations are pending;
+7. migrates;
+8. collects static files and installs the `static/` and `media/` `.htaccess` rules;
+9. restarts the app, waits for it to reload, and requests the home page.
 
 `check --deploy` always prints two warnings. Both are intentional; see
 [Raise HSTS after a week](#8-raise-hsts-after-a-week).
@@ -212,8 +269,9 @@ Then check the site:
 
 - [ ] `https://kangaroomathbd.org/` loads with styles, fonts and icons.
 - [ ] `http://kangaroomathbd.org/` redirects to `https://`.
-- [ ] `https://kangaroomathbd.org/media/` and `https://kangaroomathbd.org/static/` show
-      "Forbidden", not a file list.
+- [ ] `https://www.kangaroomathbd.org/` redirects to `https://kangaroomathbd.org/`.
+- [ ] `https://kangaroomathbd.org/media/` and `https://kangaroomathbd.org/static/`
+      show an error page (Not Found or Forbidden), not a file list.
 - [ ] An image uploaded in the content desk (`/dashboard/content/`) appears
       on the public page.
 - [ ] A test question PDF downloads from `/questions/` only after it is
@@ -265,13 +323,29 @@ Every day at 03:15, remove expired login sessions:
 cd /home/CPANELUSER/mathkangaroo && /home/CPANELUSER/virtualenv/mathkangaroo/3.12/bin/python manage.py clearsessions
 ```
 
+The backup job emails a one-line confirmation each night; a missing
+email means it stopped. Append ` >/dev/null` to the line to get email only
+for failures.
+
 `backup.sh` keeps backups in `~/mathkangaroo-data/backups`, which is on the
 same server. Download a copy now and then, or rely on the host's off-server
-backups as well. Test a restore at least once:
+backups as well.
 
-```bash
-pg_restore --no-owner -d <database> <file>.dump
-```
+Test a restore at least once, into a scratch database, **never the live
+one**:
+
+1. Create a database such as `mkrestore` in cPanel and add `CPANELUSER_mkweb`
+   to it. On PostgreSQL 15 or newer, also run
+   `GRANT ALL ON SCHEMA public TO CPANELUSER_mkweb;` on that database in
+   **phpPgAdmin**, signed in as your cPanel user. Otherwise the restore cannot
+   create tables.
+2. Restore into it, then check the tables:
+
+   ```bash
+   PGPASSWORD='<database password>' pg_restore --no-owner -h localhost -U CPANELUSER_mkweb -d CPANELUSER_mkrestore <file>.dump
+   ```
+
+3. Delete the scratch database.
 
 Back up the uploads too. They are in `public_html/media` and
 `mathkangaroo-data/private_media`.
@@ -280,9 +354,23 @@ Back up the uploads too. They are in `public_html/media` and
 
 | What | Where |
 | --- | --- |
-| Django errors and warnings | `DJANGO_LOG_FILE`, for example `~/mathkangaroo-data/logs/django.log` |
-| Start-up crashes and anything printed to stderr | The Passenger log file set in step 3, or `stderr.log` in the application root |
+| Django errors and warnings (look here first) | `DJANGO_LOG_FILE`, for example `~/mathkangaroo-data/logs/django.log` |
+| Start-up crashes | Depends on the server, see below |
 | Web server errors | **cPanel › Metrics › Errors** |
+
+Where start-up crashes go:
+
+- On Apache, they go to the Passenger log file set in step 3.
+- On LiteSpeed, they go to `stderr.log` in the application root, but only if
+  the host changed "Run on Startup" from its default.
+- Otherwise they go to a server-wide log you cannot read.
+
+When you cannot find them, reproduce the error inside the virtualenv with
+`python -c "import passenger_wsgi"` and `python manage.py check --deploy`.
+
+`django.log` is not rotated. If it grows large, empty it with
+`: > ~/mathkangaroo-data/logs/django.log`; logging continues without a
+restart.
 
 Server errors are also emailed to `DJANGO_ADMINS`.
 
@@ -290,14 +378,19 @@ Server errors are also emailed to `DJANGO_ADMINS`.
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| "Web application could not be started", or a 500 on every page | Settings refused to load: a `.env` value is missing or wrong, or a package is missing | Run `python manage.py check --deploy` in the virtualenv and read the error. Check the Passenger log. |
+| "Web application could not be started", or a 500 on every page | Settings refused to load: a `.env` value is missing or wrong, or a package is missing | Run `python -c "import passenger_wsgi"` and `python manage.py check --deploy` in the virtualenv, and read the error. |
+| `deploy.sh`: "PostgreSQL 14 or later is required" | The server's PostgreSQL is too old | See [Check the PostgreSQL version](#check-the-postgresql-version-first). |
+| `deploy.sh`: "Cannot use the database: ... password authentication failed" or "does not exist" | Wrong `DB_*` value | Copy the exact prefixed names from cPanel. Use a letters-and-digits password, or see the quoting note at the top of `.env`. |
+| `deploy.sh`/`backup.sh`: "pg_dump N cannot back up a PostgreSQL M server" | The external database is newer than the server's `pg_dump` | See the external-PostgreSQL option in [Check the PostgreSQL version](#check-the-postgresql-version-first). |
+| `migrate`: "permission denied for schema public" | PostgreSQL 15+ no longer lets every user create tables | In **phpPgAdmin**, signed in as your cPanel user, run `GRANT ALL ON SCHEMA public TO CPANELUSER_mkweb;`, or ask the host. |
 | "Bad Request (400)" | The address used is not in `DJANGO_ALLOWED_HOSTS` | Use `https://kangaroomathbd.org/`. If you changed `DJANGO_ALLOWED_HOSTS`, list host names only, then restart. |
-| "Too many redirects" | HTTPS is handled by a proxy such as Cloudflare, and Django sees plain HTTP | In Cloudflare, use SSL mode **Full (strict)** and set `DJANGO_SECURE_PROXY_SSL_HEADER=true`. As a last resort, set `DJANGO_SECURE_SSL_REDIRECT=false`; the `.htaccess` block still redirects. |
+| "Too many redirects" | Cloudflare's **Flexible** SSL mode sends plain HTTP to the server | In Cloudflare, use SSL mode **Full (strict)**; that alone fixes it. Use `DJANGO_SECURE_PROXY_SSL_HEADER=true` only if you must stay on Flexible, and know that the server then trusts a header any client can send. |
 | "CSRF verification failed" on forms | The origin is not trusted, or HTTPS is not detected | Keep `https://kangaroomathbd.org` in `DJANGO_CSRF_TRUSTED_ORIGINS`. Check the redirect row above. |
 | Unstyled pages, or 500 with "Missing staticfiles manifest entry" | Static files were not collected | Run `deploy.sh`. Check that `DJANGO_STATIC_ROOT` is inside the document root. |
 | Uploaded images missing | `DJANGO_MEDIA_ROOT` is wrong, or permissions | It must match the folder under the document root. Folders need 755 and files 644. |
 | `pip` fails building `psycopg` or `Pillow` | Old server OS without matching binary wheels | Pick another Python version in Setup Python App, or ask the host. |
 | Large PDF uploads fail | The host's request-size limit, or a missing temp folder | Run `deploy.sh`, which creates `DJANGO_FILE_UPLOAD_TEMP_DIR`. Ask the host about the upload limit; the site accepts PDFs up to 20 MB. |
+| Uploaded file names change, such as `photo.v2.jpg` becoming `photo_v2.jpg` | This is intended | Only the last extension is kept, so a web server can never treat an upload as a script. |
 | Password-reset email never arrives | SMTP settings, or mail deliverability | Check the `EMAIL_*` values and port/SSL pairing. Fix SPF/DKIM in **cPanel › Email Deliverability**. |
 | A `.env` change has no effect | The app was not restarted | Restart the app, or `touch tmp/restart.txt` |
 

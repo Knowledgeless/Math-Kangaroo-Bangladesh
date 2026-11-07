@@ -5,8 +5,9 @@
 Options -Indexes
 
 # Uploads are data, never code: refuse anything a server could execute or a
-# browser could open as an active page.
-<FilesMatch "(?i)\.(php[0-9]*|phtml|phar|pht|pl|py|cgi|fcgi|sh|asp|aspx|jsp|shtml|html?|xhtml|svgz?|js|mjs)$">
+# browser could open as an active page. The extension may appear anywhere in
+# the name, because cPanel's PHP handlers also run "shell.php.jpg".
+<FilesMatch "(?i)\.(php[0-9]*|phtml|phar|pht|pl|plx|ppl|perl|py|cgi|fcgi|sh|asp|aspx|jsp|shtml|html?|xhtml|svgz?|js|mjs)(\.|$)">
     Require all denied
 </FilesMatch>
 

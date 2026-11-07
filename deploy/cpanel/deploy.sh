@@ -7,9 +7,10 @@
 #   source /home/CPANELUSER/virtualenv/mathkangaroo/3.12/bin/activate && cd /home/CPANELUSER/mathkangaroo
 #   bash deploy/cpanel/deploy.sh
 #
-# What it does: installs requirements, validates production settings, backs up
-# the database when migrations are pending, migrates, collects static files,
-# installs the static/media .htaccess files, and restarts the app.
+# What it does: installs requirements, validates production settings and the
+# database connection, prepares folders, backs up the database when
+# migrations are pending, migrates, collects static files, installs the
+# static/media .htaccess files, and restarts the app.
 #
 # Options (environment variables):
 #   SKIP_PIP=1      do not install requirements
@@ -39,16 +40,16 @@ export DJANGO_DEBUG=false
 step "Checking the .env file"
 ENV_FILE="${DJANGO_ENV_FILE:-$APP_DIR/.env}"
 if [[ -f "$ENV_FILE" ]]; then
-    # Template placeholders look like <CPANELUSER>; e-mail addresses (<a@b>) are fine.
-    placeholders="$(grep -Eo '^[A-Za-z_][A-Za-z0-9_]*=.*<[^>@]*>' "$ENV_FILE" | cut -d= -f1 | paste -sd, - || true)"
-    [[ -z "$placeholders" ]] || fail "$ENV_FILE still has <placeholder> values for: $placeholders"
-    if grep -Eq '^[^#]*example\.org' "$ENV_FILE"; then
-        warn "$ENV_FILE still mentions example.org; replace it with the real domain."
-    fi
+    # It holds secrets even when half filled in.
     if [[ "$(stat -c '%a' "$ENV_FILE")" != 600 ]]; then
         chmod 600 "$ENV_FILE"
         echo "Restricted $ENV_FILE to its owner (chmod 600)."
     fi
+    # The placeholders that production.env.example ships with.
+    tokens='CPANELUSER|paste-the-generated-secret|database-password|mailbox-password'
+    placeholders="$(grep -iE "^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=.*<($tokens)>" "$ENV_FILE" \
+        | sed -E 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*).*/\2/' | paste -sd, - || true)"
+    [[ -z "$placeholders" ]] || fail "$ENV_FILE still has <placeholder> values for: $placeholders"
     echo "Using $ENV_FILE"
 else
     warn "No $ENV_FILE; using environment variables only."
@@ -59,14 +60,24 @@ if [[ "${SKIP_PIP:-0}" != 1 ]]; then
     python -m pip install --disable-pip-version-check -r requirements.txt
 fi
 
-step "Validating production settings"
+step "Validating production settings and the database connection"
 config="$(python - <<'PY'
 import shlex
+import sys
 
 import django
 from django.conf import settings
 
 django.setup()
+from django.db import connection
+
+try:
+    # Also enforces Django's minimum server version (PostgreSQL 14+).
+    connection.ensure_connection()
+    server_version = ".".join(str(part) for part in connection.get_database_version())
+except Exception as error:
+    sys.exit(f"Cannot use the database: {error}")
+
 db = settings.DATABASES["default"]
 values = {
     "CFG_DEBUG": "1" if settings.DEBUG else "0",
@@ -74,10 +85,12 @@ values = {
     "CFG_DB_NAME": str(db["NAME"]),
     "CFG_DB_HOST": db.get("HOST", ""),
     "CFG_DB_PORT": str(db.get("PORT", "")),
+    "CFG_DB_SERVER": server_version,
     "CFG_STATIC_ROOT": str(settings.STATIC_ROOT),
     "CFG_MEDIA_ROOT": str(settings.MEDIA_ROOT),
     "CFG_PRIVATE_MEDIA_ROOT": str(settings.PRIVATE_MEDIA_ROOT),
     "CFG_UPLOAD_TMP": settings.FILE_UPLOAD_TEMP_DIR or "",
+    "CFG_LOG_FILE": str(getattr(settings, "LOG_FILE", "") or ""),
     "CFG_EMAIL_BACKEND": settings.EMAIL_BACKEND,
     "CFG_EMAIL_HOST": settings.EMAIL_HOST,
     "CFG_HOST": next(
@@ -87,11 +100,11 @@ values = {
 for name, value in values.items():
     print(f"{name}={shlex.quote(value)}")
 PY
-)" || fail "Django could not load the production settings (see the error above)."
+)" || fail "The settings or the database are not usable yet; see the message above."
 eval "$config"
 
 [[ "$CFG_DEBUG" == 0 ]] || fail "DEBUG is on; production must run with DEBUG off."
-echo "Database:       $CFG_ENGINE $CFG_DB_NAME on ${CFG_DB_HOST:-localhost}:$CFG_DB_PORT"
+echo "Database:       $CFG_ENGINE $CFG_DB_SERVER, $CFG_DB_NAME on ${CFG_DB_HOST:-localhost}:$CFG_DB_PORT"
 echo "Static files:   $CFG_STATIC_ROOT"
 echo "Public media:   $CFG_MEDIA_ROOT"
 echo "Private media:  $CFG_PRIVATE_MEDIA_ROOT"
@@ -99,6 +112,43 @@ if [[ "$CFG_EMAIL_BACKEND" == *smtp* && -z "$CFG_EMAIL_HOST" ]]; then
     warn "EMAIL_HOST is empty, so password-reset e-mails will fail."
 fi
 
+# Folders that only the cPanel account may read. Never tighten the home
+# folder or a folder that contains the web-served static/media folders.
+private_dir() {
+    # Compare real paths, so ~, .., // and symlinks (cPanel's www -> public_html)
+    # cannot hide the home folder or the document root.
+    local dir home static media
+    dir="$(realpath -m -- "$1")"
+    home="$(realpath -m -- "$HOME")"
+    static="$(realpath -m -- "$CFG_STATIC_ROOT")"
+    media="$(realpath -m -- "$CFG_MEDIA_ROOT")"
+    mkdir -p "$dir"
+    if [[ "$dir" == "$home" || "$dir" == / || "$static/" == "$dir/"* || "$media/" == "$dir/"* ]]; then
+        warn "Left the permissions of $dir unchanged; point this setting at its own folder."
+        return 0
+    fi
+    chmod 700 "$dir"
+}
+
+# Django's checks need these folders to exist, so create them first.
+step "Preparing file directories"
+mkdir -p "$CFG_STATIC_ROOT" "$CFG_MEDIA_ROOT"
+chmod 755 "$CFG_STATIC_ROOT" "$CFG_MEDIA_ROOT"
+private_dir "$CFG_PRIVATE_MEDIA_ROOT"
+if [[ -n "$CFG_UPLOAD_TMP" ]]; then
+    private_dir "$CFG_UPLOAD_TMP"
+fi
+if [[ -n "$CFG_LOG_FILE" ]]; then
+    private_dir "$(dirname "$CFG_LOG_FILE")"
+    if [[ -f "$CFG_LOG_FILE" ]]; then
+        chmod 600 "$CFG_LOG_FILE"
+    fi
+fi
+if [[ -d "$CFG_MEDIA_ROOT/question-papers" ]] && compgen -G "$CFG_MEDIA_ROOT/question-papers/*" >/dev/null; then
+    warn "$CFG_MEDIA_ROOT/question-papers has files from an older install. Move them to $CFG_PRIVATE_MEDIA_ROOT/question-papers/ (the download view reads them from there)."
+fi
+
+step "Running Django's deployment checks"
 python manage.py check --deploy --database default
 
 step "Checking for unapplied migrations"
@@ -113,23 +163,11 @@ fi
 if [[ "$pending" == 1 && "${SKIP_BACKUP:-0}" != 1 ]]; then
     step "Backing up the database before migrating"
     PYTHON="$(command -v python)" bash "$TEMPLATE_DIR/backup.sh" \
-        || fail "The backup failed. Back up from cPanel > phpPgAdmin, then rerun with SKIP_BACKUP=1."
+        || fail "The backup failed (see above). Fix it and rerun. Use SKIP_BACKUP=1 only after exporting the database yourself (cPanel > phpPgAdmin, or your database provider's backup)."
 fi
 
 step "Applying migrations"
 python manage.py migrate --noinput
-
-step "Preparing file directories"
-mkdir -p "$CFG_STATIC_ROOT" "$CFG_MEDIA_ROOT" "$CFG_PRIVATE_MEDIA_ROOT"
-chmod 755 "$CFG_STATIC_ROOT" "$CFG_MEDIA_ROOT"
-chmod 700 "$CFG_PRIVATE_MEDIA_ROOT"
-if [[ -n "$CFG_UPLOAD_TMP" ]]; then
-    mkdir -p "$CFG_UPLOAD_TMP"
-    chmod 700 "$CFG_UPLOAD_TMP"
-fi
-if [[ -d "$CFG_MEDIA_ROOT/question-papers" ]] && compgen -G "$CFG_MEDIA_ROOT/question-papers/*" >/dev/null; then
-    warn "$CFG_MEDIA_ROOT/question-papers has files from an older install. Move them to $CFG_PRIVATE_MEDIA_ROOT/question-papers/ (the download view reads them from there)."
-fi
 
 step "Collecting static files"
 python manage.py collectstatic --noinput
@@ -153,17 +191,26 @@ document_root_htaccess="$(dirname "$CFG_STATIC_ROOT")/.htaccess"
 if [[ ! -f "$document_root_htaccess" ]] || ! grep -q "PassengerAppRoot" "$document_root_htaccess"; then
     warn "$document_root_htaccess has no Passenger block. Create the app in cPanel > Setup Python App, or check that DJANGO_STATIC_ROOT is inside the domain's document root."
 elif ! grep -qF "BEGIN Math Kangaroo Bangladesh" "$document_root_htaccess"; then
-    warn "Add the block from deploy/cpanel/htaccess-document-root.txt to $document_root_htaccess (HTTPS redirect, no directory listings)."
+    warn "Add the block from deploy/cpanel/htaccess-document-root.txt to $document_root_htaccess (HTTPS and www redirects, no directory listings)."
 fi
 
 step "Restarting the application"
 mkdir -p tmp
 touch tmp/restart.txt
-echo "Passenger reloads the app on the next request."
+echo "Passenger reloads the app within a few seconds."
 
 if [[ -n "$CFG_HOST" ]] && command -v curl >/dev/null; then
     step "Checking https://$CFG_HOST/"
-    status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 60 "https://$CFG_HOST/" || true)"
+    # Passenger notices restart.txt only every few seconds; give it time so
+    # the check is answered by the new release, not the previous one.
+    sleep 12
+    status=""
+    for attempt in 1 2 3; do
+        status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 60 "https://$CFG_HOST/" || true)"
+        [[ "$status" == 000 ]] && status=""
+        [[ "$status" == 200 || "$attempt" == 3 ]] && break
+        sleep 5
+    done
     if [[ "$status" == 200 ]]; then
         echo "The home page answered 200 OK."
     else

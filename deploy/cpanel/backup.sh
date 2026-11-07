@@ -8,6 +8,8 @@
 #
 # Options (environment variables):
 #   PYTHON=path     Python of the app's virtualenv (default: python on PATH)
+#   PG_DUMP=path    pg_dump to use; its major version must be at least the
+#                   server's (default: pg_dump on PATH)
 #   BACKUP_DIR=dir  where backups go (default ~/mathkangaroo-data/backups)
 #   KEEP_DAYS=n     delete this database's backups older than n days (default 14; 0 keeps all)
 
@@ -27,8 +29,18 @@ export DJANGO_DEBUG=false
 
 config="$("$PYTHON" - <<'PY'
 import shlex
+import sys
 
+import django
 from django.conf import settings
+
+django.setup()
+from django.db import connection
+
+try:
+    server_major = str(connection.get_database_version()[0])
+except Exception as error:
+    sys.exit(f"Cannot use the database: {error}")
 
 db = settings.DATABASES["default"]
 values = {
@@ -38,11 +50,12 @@ values = {
     "DB_PASSWORD_": db.get("PASSWORD", ""),
     "DB_HOST_": db.get("HOST", "") or "localhost",
     "DB_PORT_": str(db.get("PORT", "")),
+    "DB_SERVER_MAJOR": server_major,
 }
 for name, value in values.items():
     print(f"{name}={shlex.quote(value)}")
 PY
-)" || fail "Django could not load the settings; run this inside the app's virtualenv or set PYTHON."
+)" || fail "Django could not load the settings or reach the database (see above). Run this inside the app's virtualenv or set PYTHON."
 eval "$config"
 
 mkdir -p "$BACKUP_DIR"
@@ -55,10 +68,17 @@ trap 'if [[ -n "$backup" ]]; then rm -f "$backup.partial"; fi' EXIT
 
 case "$DB_KIND" in
     postgresql)
-        command -v pg_dump >/dev/null \
+        PG_DUMP="${PG_DUMP:-pg_dump}"
+        command -v "$PG_DUMP" >/dev/null \
             || fail "pg_dump is not available. Export the database from cPanel > phpPgAdmin instead."
+        # pg_dump refuses servers newer than itself (for example cPanel's
+        # pg_dump 13 against an external PostgreSQL 16).
+        client_major="$("$PG_DUMP" --version | grep -oE '[0-9]+' | head -n 1)"
+        if (( client_major < DB_SERVER_MAJOR )); then
+            fail "pg_dump $client_major cannot back up a PostgreSQL $DB_SERVER_MAJOR server. Use your database provider's backups, or set PG_DUMP to a pg_dump $DB_SERVER_MAJOR or newer."
+        fi
         backup="$BACKUP_DIR/$DB_NAME_-$stamp.dump"
-        PGPASSWORD="$DB_PASSWORD_" pg_dump --format=custom --no-owner \
+        PGPASSWORD="$DB_PASSWORD_" "$PG_DUMP" --format=custom --no-owner \
             --host="$DB_HOST_" --port="$DB_PORT_" --username="$DB_USER_" \
             --file="$backup.partial" "$DB_NAME_"
         ;;

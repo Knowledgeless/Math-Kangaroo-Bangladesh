@@ -16,7 +16,7 @@
       {{ locations|json_script:"bangladesh-locations-data" }}
       {% for field in form %}
         {% if field.name == "school_name" %}<div class="registration-divider"><span class="eyebrow">This year's Olympiad</span><p>Your school and class are saved with this year's record. You can update your profile during the dates set by the organizers.</p></div>{% endif %}
-        <div class="form-field{% if field.name == 'first_name' or field.name == 'last_name' %} form-field-half{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span aria-hidden="true"> *</span>{% endif %}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>
+        <div class="form-field{% if field.name == 'first_name' or field.name == 'last_name' %} form-field-half{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>
       {% endfor %}
       <p class="location-hint">Choose a division first, then its district and upazila.</p>
       <button class="button button-dark button-full" type="submit">Create account &amp; register <i class="bi bi-arrow-up-right" aria-hidden="true"></i></button>

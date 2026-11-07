@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import FileResponse
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -32,6 +32,7 @@ from .content_sanitizer import sanitize_about_content
 from .models import (
     AboutPage,
     Announcement,
+    AnnouncementImage,
     FAQ,
     FAQCategory,
     HeroSlide,
@@ -108,10 +109,15 @@ def hero_slide_archive(request, pk):
     return redirect("home")
 
 
+def _public_images():
+    """Announcement images that have a file; rows without one are never rendered."""
+    return Prefetch("images", queryset=AnnouncementImage.objects.exclude(image=""))
+
+
 def _home_context(request):
     announcements = Announcement.objects.filter(
         status=PublicationStatus.PUBLISHED,
-    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())).prefetch_related("images")
+    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())).prefetch_related(_public_images())
     current_season = CompetitionSeason.objects.filter(is_current=True).first()
     can_manage_hero = (
         request.user.is_authenticated
@@ -149,7 +155,7 @@ def _home_context(request):
 def announcement_list(request):
     announcements = Announcement.objects.filter(
         status=PublicationStatus.PUBLISHED,
-    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())).prefetch_related("images")
+    ).filter(Q(published_at__isnull=True) | Q(published_at__lte=timezone.now())).prefetch_related(_public_images())
     search = request.GET.get("q", "").strip()
     category = request.GET.get("category", "")
     year = request.GET.get("year", "")
@@ -187,7 +193,7 @@ def announcement_detail(request, slug):
     announcement = get_object_or_404(
         Announcement.objects.filter(status=PublicationStatus.PUBLISHED)
         .filter(Q(published_at__isnull=True) | Q(published_at__lte=now))
-        .prefetch_related("images"),
+        .prefetch_related(_public_images()),
         slug=slug,
     )
     related = Announcement.objects.filter(
@@ -261,7 +267,7 @@ def about_page(request):
             "about_feature_heading_html": lead_html,
             "about_content_html": remaining_content_html,
             "about_sections": about_sections,
-            "about_images": about.images.all() if about else (),
+            "about_images": about.images.exclude(image="") if about else (),
         },
     )
 
@@ -489,6 +495,20 @@ def question_paper_archive(request, pk):
     return redirect("cms-dashboard")
 
 
+@login_required
+@permission_required("cms.delete_questionpaper", raise_exception=True)
+def question_paper_delete(request, pk):
+    if request.method != "POST":
+        raise Http404
+    paper = get_object_or_404(QuestionPaper, pk=pk)
+    record_event(request, action="question_paper.deleted", instance=paper)
+    # The PDF lives in private storage, so it is removed with its record.
+    paper.pdf_file.delete(save=False)
+    paper.delete()
+    messages.success(request, "Question PDF deleted.")
+    return redirect("cms-dashboard")
+
+
 def question_paper_download(request, pk):
     paper = get_object_or_404(QuestionPaper, pk=pk)
     if not paper.is_public():
@@ -511,6 +531,32 @@ def syllabus_create(request):
 @permission_required("competitions.change_syllabus", raise_exception=True)
 def syllabus_update(request, pk):
     return syllabus_edit(request, get_object_or_404(Syllabus, pk=pk))
+
+
+@login_required
+@permission_required("competitions.change_syllabus", raise_exception=True)
+def syllabus_archive(request, pk):
+    if request.method != "POST":
+        raise Http404
+    syllabus = get_object_or_404(Syllabus, pk=pk)
+    syllabus.status = Syllabus.Status.ARCHIVED
+    syllabus.save(update_fields=["status", "updated_at"])
+    record_event(request, action="syllabus.archived", instance=syllabus)
+    messages.success(request, "Syllabus archived.")
+    return redirect("cms-dashboard")
+
+
+@login_required
+@permission_required("competitions.delete_syllabus", raise_exception=True)
+def syllabus_delete(request, pk):
+    if request.method != "POST":
+        raise Http404
+    syllabus = get_object_or_404(Syllabus, pk=pk)
+    record_event(request, action="syllabus.deleted", instance=syllabus)
+    # Topics are removed with the syllabus; the division itself is kept.
+    syllabus.delete()
+    messages.success(request, "Syllabus deleted.")
+    return redirect("cms-dashboard")
 
 
 def syllabus_edit(request, instance):
@@ -660,6 +706,46 @@ def announcement_archive(request, pk):
     announcement.save(update_fields=["status", "updated_at"])
     record_event(request, action="announcement.archived", instance=announcement)
     messages.success(request, "Announcement archived.")
+    return redirect("cms-dashboard")
+
+
+@login_required
+@permission_required("cms.delete_announcement", raise_exception=True)
+def announcement_delete(request, pk):
+    if request.method != "POST":
+        raise Http404
+    announcement = get_object_or_404(Announcement, pk=pk)
+    # The audit entry needs the primary key, so it is written before the delete.
+    record_event(request, action="announcement.deleted", instance=announcement)
+    for image in announcement.images.all():
+        image.image.delete(save=False)
+    announcement.delete()
+    messages.success(request, "Announcement deleted.")
+    return redirect("cms-dashboard")
+
+
+@login_required
+@permission_required("cms.change_faq", raise_exception=True)
+def faq_archive(request, pk):
+    if request.method != "POST":
+        raise Http404
+    faq = get_object_or_404(FAQ, pk=pk)
+    faq.status = PublicationStatus.ARCHIVED
+    faq.save(update_fields=["status", "updated_at"])
+    record_event(request, action="faq.archived", instance=faq)
+    messages.success(request, "FAQ archived.")
+    return redirect("cms-dashboard")
+
+
+@login_required
+@permission_required("cms.delete_faq", raise_exception=True)
+def faq_delete(request, pk):
+    if request.method != "POST":
+        raise Http404
+    faq = get_object_or_404(FAQ, pk=pk)
+    record_event(request, action="faq.deleted", instance=faq)
+    faq.delete()
+    messages.success(request, "FAQ deleted.")
     return redirect("cms-dashboard")
 
 

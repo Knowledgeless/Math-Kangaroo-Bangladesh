@@ -4,6 +4,7 @@ from django.core.validators import FileExtensionValidator, MaxValueValidator, Mi
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 
 from apps.core.storage import PrivateMediaStorage
 from apps.core.validators import validate_safe_link
@@ -122,6 +123,28 @@ class Announcement(models.Model):
     def clean(self):
         if self.cover_image_url and not self.cover_image_alt_text.strip():
             raise ValidationError({"cover_image_alt_text": "Describe the image for visitors who cannot see it."})
+
+    def build_slug(self):
+        """A unique slug from the title; staff never have to write one."""
+        # A title in Bengali (or any non-Latin script) slugifies to nothing,
+        # so fall back to a stable, readable stem.
+        stem = slugify(self.title)[:180] or "announcement"
+        candidate = stem
+        suffix = 2
+        taken = Announcement.objects.exclude(pk=self.pk)
+        while taken.filter(slug=candidate).exists():
+            candidate = f"{stem}-{suffix}"
+            suffix += 1
+        return candidate
+
+    def save(self, *args, **kwargs):
+        # Only filled in when missing, so published URLs never move on an edit.
+        if not self.slug:
+            self.slug = self.build_slug()
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None and "slug" not in update_fields:
+                kwargs["update_fields"] = [*update_fields, "slug"]
+        super().save(*args, **kwargs)
 
     def get_absolute_url(self):
         return reverse("announcement-detail", kwargs={"slug": self.slug})

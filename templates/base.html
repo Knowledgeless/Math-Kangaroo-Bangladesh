@@ -57,6 +57,7 @@
         <div class="toast-notification {% if 'success' in message.tags %}toast-success{% elif 'error' in message.tags %}toast-error{% elif 'warning' in message.tags %}toast-warning{% else %}toast-info{% endif %}" role="{% if 'error' in message.tags %}alert{% else %}status{% endif %}" data-toast>
           <span>{{ message }}</span>
           <button type="button" class="toast-dismiss" aria-label="Dismiss notification"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+          <span class="toast-progress" aria-hidden="true"></span>
         </div>
       {% endfor %}
     </div>

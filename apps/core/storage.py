@@ -4,8 +4,30 @@ from django.utils.deconstruct import deconstructible
 from django.utils.functional import cached_property
 
 
+class SingleExtensionNameMixin:
+    """Keep only the final extension of an uploaded file's name.
+
+    "shell.php.jpg" becomes "shell_php.jpg". Web servers that map handlers by
+    any extension in a name (Apache's AddHandler, used by cPanel MultiPHP)
+    would otherwise run such an upload as a script. Hidden names are refused.
+    """
+
+    def get_valid_name(self, name):
+        name = super().get_valid_name(name)
+        stem, dot, extension = name.rpartition(".")
+        if not dot:
+            return name
+        stem = stem.replace(".", "_").strip("_") or "upload"
+        return f"{stem}.{extension}"
+
+
+@deconstructible(path="apps.core.storage.PublicMediaStorage")
+class PublicMediaStorage(SingleExtensionNameMixin, FileSystemStorage):
+    """Default storage for public uploads under MEDIA_ROOT."""
+
+
 @deconstructible(path="apps.core.storage.PrivateMediaStorage")
-class PrivateMediaStorage(FileSystemStorage):
+class PrivateMediaStorage(SingleExtensionNameMixin, FileSystemStorage):
     """Uploads that must never be reachable by URL.
 
     Files live under PRIVATE_MEDIA_ROOT, outside every web-served directory,

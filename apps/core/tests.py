@@ -45,6 +45,24 @@ print(json.dumps({
     "EMAIL_USE_TLS": settings.EMAIL_USE_TLS,
     "ADMINS": settings.ADMINS,
     "LOG_HANDLERS": sorted(getattr(settings, "LOGGING", {}).get("handlers", {})),
+    "DISALLOWED_HOST_HANDLERS": (
+        getattr(settings, "LOGGING", {})
+        .get("loggers", {})
+        .get("django.security.DisallowedHost", {})
+        .get("handlers")
+    ),
+    "DB_PASSWORD": settings.DATABASES["default"].get("PASSWORD", ""),
+    "DB_OPTIONS": settings.DATABASES["default"].get("OPTIONS", {}),
+    "EMAIL_HOST_PASSWORD": settings.EMAIL_HOST_PASSWORD,
+    "FILE_UPLOAD_TEMP_DIR": settings.FILE_UPLOAD_TEMP_DIR,
+    "DEFAULT_STORAGE": settings.STORAGES["default"]["BACKEND"],
+    "LOG_FILE": getattr(settings, "LOG_FILE", None),
+    "DISALLOWED_HOST_FILTERS": (
+        getattr(settings, "LOGGING", {})
+        .get("loggers", {})
+        .get("django.security.DisallowedHost", {})
+        .get("filters")
+    ),
 }))
 """
 
@@ -129,6 +147,9 @@ class DeploymentSettingsTests(SimpleTestCase):
         self.assertEqual(config["STATIC_ROOT"], str((self.tmp / "public_html" / "static").resolve()))
         self.assertEqual(config["PRIVATE_MEDIA_ROOT"], str((self.tmp / "private_media").resolve()))
         self.assertIn("console", config["LOG_HANDLERS"])
+        self.assertEqual(config["DEFAULT_STORAGE"], "apps.core.storage.PublicMediaStorage")
+        self.assertIsNone(config["FILE_UPLOAD_TEMP_DIR"])
+        self.assertEqual(config["DB_OPTIONS"], {})
 
     def test_https_and_hsts_options_can_be_tuned_from_the_environment(self):
         config = self.load_settings(
@@ -168,6 +189,34 @@ class DeploymentSettingsTests(SimpleTestCase):
             {"DJANGO_PRIVATE_MEDIA_ROOT": str(self.tmp / "public_html" / "private")},
         )
 
+    def test_unknown_host_errors_are_logged_but_never_emailed(self):
+        log_file = self.tmp / "logs" / "django.log"
+        config = self.load_settings({"DJANGO_LOG_FILE": str(log_file)})
+        self.assertEqual(config["DISALLOWED_HOST_HANDLERS"], ["console", "file"])
+        self.assertEqual(config["DISALLOWED_HOST_FILTERS"], ["omit_traceback"])
+        self.assertTrue(log_file.parent.is_dir())
+        self.assertEqual(log_file.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_log_file_path_is_resolved_like_the_other_paths(self):
+        # deploy.sh tightens the log folder; it must see the real path, never
+        # an unresolved "~" or ".." that could point at the home folder.
+        (self.tmp / "app").mkdir()
+        config = self.load_settings({"DJANGO_LOG_FILE": str(self.tmp / "app" / ".." / "logs" / "django.log")})
+        self.assertEqual(config["LOG_FILE"], str((self.tmp / "logs" / "django.log").resolve()))
+
+    def test_external_database_and_upload_folder_options(self):
+        config = self.load_settings(
+            {"DB_SSLMODE": "require", "DJANGO_FILE_UPLOAD_TEMP_DIR": "~/mathkangaroo-data/upload_tmp"}
+        )
+        self.assertEqual(config["DB_OPTIONS"], {"sslmode": "require"})
+        self.assertEqual(
+            config["FILE_UPLOAD_TEMP_DIR"],
+            str((Path.home() / "mathkangaroo-data" / "upload_tmp").resolve()),
+        )
+
+    def test_email_ssl_and_tls_cannot_both_be_on(self):
+        self.assert_refused("Set only one of EMAIL_USE_SSL", {"EMAIL_USE_SSL": "true", "EMAIL_USE_TLS": "true"})
+
     def test_cpanel_mail_and_admin_settings(self):
         config = self.load_settings(
             {
@@ -181,6 +230,17 @@ class DeploymentSettingsTests(SimpleTestCase):
             config["ADMINS"],
             [["Site Admin", "admin@example.org"], ["", "ops@example.org"]],
         )
+
+    def test_env_file_values_are_taken_literally(self):
+        env_file = self.tmp / ".env"
+        env_file.write_text(
+            "DB_PASSWORD=pa${HOME}ss\n"
+            "EMAIL_HOST_PASSWORD='a b#c$d'\n",
+            encoding="utf-8",
+        )
+        config = self.load_settings({"DJANGO_ENV_FILE": str(env_file)}, drop=("DB_PASSWORD",))
+        self.assertEqual(config["DB_PASSWORD"], "pa${HOME}ss")
+        self.assertEqual(config["EMAIL_HOST_PASSWORD"], "a b#c$d")
 
     def test_env_file_fills_values_without_overriding_the_process_environment(self):
         env_file = self.tmp / ".env"
@@ -225,3 +285,18 @@ class DeploymentSettingsTests(SimpleTestCase):
         )
         self.assertNotEqual(missing_secret.returncode, 0)
         self.assertIn("DJANGO_SECRET_KEY", missing_secret.stderr)
+
+
+class OmitTracebackFilterTests(SimpleTestCase):
+    def test_record_keeps_its_message_but_loses_the_traceback(self):
+        import logging
+
+        from apps.core.log_filters import OmitTraceback
+
+        try:
+            raise ValueError("boom")
+        except ValueError:
+            record = logging.LogRecord("x", logging.ERROR, __file__, 1, "Invalid HTTP_HOST", (), sys.exc_info())
+        self.assertTrue(OmitTraceback().filter(record))
+        self.assertIsNone(record.exc_info)
+        self.assertEqual(logging.Formatter().format(record), "Invalid HTTP_HOST")

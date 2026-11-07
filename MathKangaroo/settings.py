@@ -18,7 +18,8 @@ ENV_FILE = Path(os.environ.get("DJANGO_ENV_FILE") or BASE_DIR / ".env")
 if ENV_FILE.is_file():
     from dotenv import load_dotenv
 
-    load_dotenv(ENV_FILE, override=False)
+    # interpolate=False keeps values such as passwords containing "${" literal.
+    load_dotenv(ENV_FILE, override=False, interpolate=False)
 
 
 def env(name, default=""):
@@ -131,8 +132,8 @@ WSGI_APPLICATION = 'MathKangaroo.wsgi.application'
 
 
 # --- Database --------------------------------------------------------------
-# Production uses PostgreSQL (cPanel > PostgreSQL Databases). SQLite is only
-# for local development; production refuses to start with anything else.
+# Production uses PostgreSQL 14 or newer (Django 5.2's minimum). SQLite is
+# only for local development; production refuses to start with anything else.
 
 DB_ENGINE = env("DB_ENGINE", "sqlite" if DEBUG else "postgresql").lower()
 DB_CONN_MAX_AGE = env_int("DB_CONN_MAX_AGE", 60)
@@ -150,6 +151,9 @@ if DB_ENGINE in {"postgresql", "postgres"}:
             "CONN_HEALTH_CHECKS": True,
         }
     }
+    # For an external/managed PostgreSQL server set DB_SSLMODE=require.
+    if env("DB_SSLMODE"):
+        DATABASES["default"]["OPTIONS"] = {"sslmode": env("DB_SSLMODE")}
 elif DB_ENGINE in {"sqlite", "sqlite3"}:
     DATABASES = {
         "default": {
@@ -202,6 +206,10 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", not EMAIL_USE_SSL)
+if EMAIL_USE_SSL and EMAIL_USE_TLS:
+    raise ImproperlyConfigured(
+        "Set only one of EMAIL_USE_SSL (port 465) or EMAIL_USE_TLS (port 587) to true."
+    )
 EMAIL_TIMEOUT = env_int("EMAIL_TIMEOUT", 20)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Math Kangaroo Bangladesh <no-reply@mathkangaroo.bd>")
 SERVER_EMAIL = env("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
@@ -246,7 +254,9 @@ if "public_html" in _private_media.parts:
     )
 
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    # Public uploads keep a single extension ("shell.php.jpg" -> "shell_php.jpg")
+    # so a web server can never treat an uploaded image as a script.
+    "default": {"BACKEND": "apps.core.storage.PublicMediaStorage"},
     "staticfiles": {
         "BACKEND": (
             "django.contrib.staticfiles.storage.StaticFilesStorage"
@@ -260,7 +270,8 @@ FILE_UPLOAD_PERMISSIONS = 0o644
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 # Uploads larger than 2.5 MB are buffered to disk; shared hosts often have a
 # small /tmp, so allow a directory inside the account instead.
-FILE_UPLOAD_TEMP_DIR = env("DJANGO_FILE_UPLOAD_TEMP_DIR") or None
+_upload_tmp = env_path("DJANGO_FILE_UPLOAD_TEMP_DIR", None)
+FILE_UPLOAD_TEMP_DIR = str(_upload_tmp) if _upload_tmp else None
 
 
 # --- Security --------------------------------------------------------------
@@ -288,19 +299,27 @@ if not DEBUG:
 
 
 # --- Logging ---------------------------------------------------------------
-# Production logs go to stderr, which Passenger writes to the application's
-# log (cPanel: stderr.log in the application root, or the "Passenger log file"
-# set in Setup Python App), and optionally to DJANGO_LOG_FILE. Server errors
-# are also emailed to DJANGO_ADMINS when it is set.
+# Production logs go to DJANGO_LOG_FILE (the place to look first) and to
+# stderr, which ends up in the "Passenger log file" set in Setup Python App or,
+# depending on the host, in a server-wide log. Server errors are also emailed
+# to DJANGO_ADMINS when it is set.
 
 if not DEBUG:
     LOG_LEVEL = env("DJANGO_LOG_LEVEL", "INFO").upper()
-    LOG_FILE = env("DJANGO_LOG_FILE")
+    # Resolved like the other paths (~, .. and symlinks), so deploy.sh sees the real folder.
+    _log_file = env_path("DJANGO_LOG_FILE", None)
+    LOG_FILE = str(_log_file) if _log_file else ""
     _log_handlers = ["console", "mail_admins"]
+    # Requests for unknown host names (scanners) are logged but never emailed:
+    # emailing happens inside the request and would let bots flood the inbox.
+    _quiet_handlers = ["console"]
     LOGGING = {
         "version": 1,
         "disable_existing_loggers": False,
-        "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
+        "filters": {
+            "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+            "omit_traceback": {"()": "apps.core.log_filters.OmitTraceback"},
+        },
         "formatters": {
             "verbose": {"format": "{asctime} {levelname} {name} {process:d} {message}", "style": "{"},
         },
@@ -315,16 +334,25 @@ if not DEBUG:
         "root": {"handlers": ["console"], "level": "WARNING"},
         "loggers": {
             "django": {"handlers": _log_handlers, "level": LOG_LEVEL, "propagate": False},
+            "django.security.DisallowedHost": {
+                "handlers": _quiet_handlers,
+                "level": "WARNING",
+                "filters": ["omit_traceback"],
+                "propagate": False,
+            },
         },
     }
     if LOG_FILE:
-        Path(LOG_FILE).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        _log_path = Path(LOG_FILE)
+        # Logs hold request details; keep a new log folder private to the account.
+        _log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         LOGGING["handlers"]["file"] = {
             "class": "logging.handlers.WatchedFileHandler",
-            "filename": str(Path(LOG_FILE).expanduser()),
+            "filename": str(_log_path),
             "formatter": "verbose",
         }
         LOGGING["root"]["handlers"].append("file")
         _log_handlers.append("file")
+        _quiet_handlers.append("file")
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

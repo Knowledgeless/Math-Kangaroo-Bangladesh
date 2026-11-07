@@ -14,7 +14,7 @@
     <div class="staff-user-identity"><span class="eyebrow">Participant username</span><strong>{{ account.username }}</strong><small>This login identifier is not editable.</small></div>
     {% for field in form %}
       <div class="form-field {% if field.name == 'is_active' %}staff-user-active-field{% endif %}">
-        {% if field.name == "is_active" %}<label class="staff-user-checkbox">{{ field }}<span>{{ field.label }}</span></label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% endif %}
+        {% if field.name == "is_active" %}<label class="staff-user-checkbox">{{ field }}<span>{{ field.label }}</span></label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}</label>{{ field }}{% endif %}
         {% for error in field.errors %}<span class="field-error" role="alert">{{ error }}</span>{% endfor %}
       </div>
     {% endfor %}

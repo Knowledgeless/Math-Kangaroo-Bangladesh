@@ -33,7 +33,11 @@ def serve_media(request, path):
     # web server serves MEDIA_ROOT directly when it lives in public_html).
     # Normalize exactly as django.views.static.serve does, so dot segments
     # ("hero-slides/../question-papers/...") cannot slip past the check.
-    if posixpath.normpath(path).lstrip("/").startswith(PRIVATE_MEDIA_PREFIXES):
+    normalized = posixpath.normpath(path).lstrip("/")
+    if normalized.startswith(PRIVATE_MEDIA_PREFIXES):
+        raise Http404
+    # Never serve hidden files such as media/.htaccess.
+    if any(part.startswith(".") for part in normalized.split("/")):
         raise Http404
     return serve(request, path, document_root=settings.MEDIA_ROOT)
 

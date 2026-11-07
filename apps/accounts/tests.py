@@ -65,6 +65,17 @@ class AccountFlowTests(TestCase):
         self.assertContains(response, "toast-info")
         self.assertContains(response, 'role="alert"')
         self.assertEqual(response.content.count(b'data-toast'), 4)
+        # Each toast carries its own countdown bar, tinted by the toast's colour.
+        self.assertEqual(response.content.count(b'class="toast-progress"'), 4)
+
+    def test_signup_marks_required_fields_and_leaves_optional_ones_unmarked(self):
+        page = self.client.get(reverse("accounts:signup")).content.decode()
+        star = '<span class="required-mark" aria-hidden="true">*</span>'
+        self.assertIn("Date of birth" + star, page)
+        self.assertIn("Parent or guardian name" + star, page)
+        # The one optional field on the form must not be starred.
+        self.assertIn("Student phone (optional)</label>", page)
+        self.assertNotIn("Student phone (optional)" + star, page)
 
     def test_signup_creates_student_profile_annual_registration_and_participant_login(self):
         response = self.client.post(

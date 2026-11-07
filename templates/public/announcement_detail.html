@@ -3,14 +3,14 @@
 {% block meta_description %}{{ announcement.meta_description|default:announcement.summary }}{% endblock %}
 {% block content %}
 <section class="article-shell">
-  <a class="back-link" href="{% url 'announcement-list' %}"><i class="bi bi-chevron-left" aria-hidden="true"></i> All announcements</a>
+  <a class="back-link" href="{% url 'announcement-list' %}"><i class="bi bi-chevron-left" aria-hidden="true"></i> All Announcements</a>
   <article class="article-content">
     <div class="meta-line"><span class="category-pill">{{ announcement.get_category_display }}</span>{% if announcement.published_at %}<time datetime="{{ announcement.published_at|date:'c' }}">{{ announcement.published_at|date:"F j, Y" }}</time>{% endif %}</div>
     <h1>{{ announcement.title }}</h1><p class="article-summary">{{ announcement.summary }}</p>
-    {% for image in announcement.images.all %}<img class="article-image" src="{{ image.image.url }}" alt="{{ image.alt_text }}" loading="lazy">{% empty %}{% if announcement.cover_image_url %}<img class="article-image" src="{{ announcement.cover_image_url }}" alt="{{ announcement.cover_image_alt_text }}" loading="lazy" referrerpolicy="no-referrer">{% endif %}{% endfor %}
+    {% for image in announcement.images.all %}{% if image.image %}<img class="article-image" src="{{ image.image.url }}" alt="{{ image.alt_text }}" loading="lazy">{% endif %}{% empty %}{% if announcement.cover_image_url %}<img class="article-image" src="{{ announcement.cover_image_url }}" alt="{{ announcement.cover_image_alt_text }}" loading="lazy" referrerpolicy="no-referrer">{% endif %}{% endfor %}
     <div class="article-body">{{ announcement.content|linebreaks }}</div>
     <div class="article-end"><i class="bi bi-stars" aria-hidden="true"></i><span>Keep wondering.</span></div>
   </article>
-  {% if related %}<aside class="related-stories"><div class="section-heading"><div><span class="eyebrow">Keep exploring</span><h2>More from the noticeboard.</h2></div></div><div class="related-list">{% for item in related %}<a href="{{ item.get_absolute_url }}"><span class="category-pill">{{ item.get_category_display }}</span><strong>{{ item.title }}</strong><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>{% endfor %}</div></aside>{% endif %}
+  {% if related %}<aside class="related-stories"><div class="section-heading"><div><span class="eyebrow">Keep Exploring</span><h2>More from the noticeboard.</h2></div></div><div class="related-list">{% for item in related %}<a href="{{ item.get_absolute_url }}"><span class="category-pill">{{ item.get_category_display }}</span><strong>{{ item.title }}</strong><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>{% endfor %}</div></aside>{% endif %}
 </section>
 {% endblock %}

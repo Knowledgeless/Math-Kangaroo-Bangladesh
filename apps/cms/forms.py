@@ -28,11 +28,12 @@ class StyledModelForm(forms.ModelForm):
 
 
 class AnnouncementForm(StyledModelForm):
+    # No slug field: the model builds one from the title on first save and
+    # keeps it afterwards, so a published web address never moves.
     class Meta:
         model = Announcement
         fields = (
             "title",
-            "slug",
             "summary",
             "content",
             "category",
@@ -61,10 +62,16 @@ class AnnouncementImageField(forms.ImageField):
 
 
 class AnnouncementImageForm(StyledModelForm):
+    # Required for every row that is kept: an existing row keeps its current
+    # file, but a new or filled-in row without a file is rejected instead of
+    # being saved as an image row with nothing to show. Blank extra rows are
+    # skipped by the formset.
     image = AnnouncementImageField(
-        required=False,
         label="Image",
         help_text="Use a 1200 × 630 image smaller than 300 KB.",
+        error_messages={
+            "required": "Choose an image file for this row, or tick “Remove image”.",
+        },
     )
 
     class Meta:

@@ -24,7 +24,7 @@
 
         {% for field in form %}
             <div class="form-field field-full">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}</label>
                 {% if field.name == "division" %}
                     <div class="syllabus-category-picker" data-syllabus-category-picker>
                         {{ field }}
@@ -113,7 +113,7 @@
                             {% for field in topic_form.visible_fields %}
                                 {% if field.name != "DELETE" %}
                                     <div class="form-field">
-                                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}</label>
                                         {{ field }}
 
                                         {% for error in field.errors %}
@@ -142,7 +142,7 @@
                         {% for field in topic_formset.empty_form.visible_fields %}
                             {% if field.name != "DELETE" %}
                                 <div class="form-field">
-                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}</label>
                                     {{ field }}
 
                                     {% for error in field.errors %}

@@ -206,15 +206,23 @@
     previous.className = "date-picker-month-button";
     previous.setAttribute("aria-label", "Previous month");
     previous.innerHTML = '<i class="bi bi-chevron-left" aria-hidden="true"></i>';
-    const monthLabel = document.createElement("strong");
-    monthLabel.className = "date-picker-month";
-    monthLabel.setAttribute("aria-live", "polite");
+    // A birth year is many months away, so the month and year are chosen
+    // directly instead of only by stepping with the arrows.
+    const monthSelect = document.createElement("select");
+    monthSelect.className = "date-picker-month-select";
+    monthSelect.setAttribute("aria-label", "Month");
+    const yearSelect = document.createElement("select");
+    yearSelect.className = "date-picker-year-select";
+    yearSelect.setAttribute("aria-label", "Year");
+    const monthPicker = document.createElement("div");
+    monthPicker.className = "date-picker-month";
+    monthPicker.append(monthSelect, yearSelect);
     const next = document.createElement("button");
     next.type = "button";
     next.className = "date-picker-month-button";
     next.setAttribute("aria-label", "Next month");
     next.innerHTML = '<i class="bi bi-chevron-right" aria-hidden="true"></i>';
-    header.append(previous, monthLabel, next);
+    header.append(previous, monthPicker, next);
     const grid = document.createElement("div");
     grid.className = "date-picker-grid";
     grid.setAttribute("role", "grid");
@@ -241,8 +249,28 @@
     const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    let visibleMonth = parseDate(input.value) || new Date();
-    visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+    for (let month = 0; month < 12; month += 1) {
+      const option = document.createElement("option");
+      option.value = String(month);
+      option.textContent = new Date(2000, month, 1).toLocaleDateString(undefined, { month: "long" });
+      monthSelect.append(option);
+    }
+    // Newest first, so a student's birth year is near the top of the list.
+    for (let year = today.getFullYear(); year >= today.getFullYear() - 100; year -= 1) {
+      const option = document.createElement("option");
+      option.value = String(year);
+      option.textContent = String(year);
+      yearSelect.append(option);
+    }
+    // Keep the shown month inside the range the two dropdowns offer.
+    const clampMonth = (date) => {
+      const month = new Date(date.getFullYear(), date.getMonth(), 1);
+      const earliest = new Date(today.getFullYear() - 100, 0, 1);
+      const latest = new Date(today.getFullYear(), today.getMonth(), 1);
+      if (month < earliest) return earliest;
+      return month > latest ? latest : month;
+    };
+    let visibleMonth = clampMonth(parseDate(input.value) || today);
     const closeCalendar = (returnFocus = false) => {
       calendar.hidden = true;
       toggle.setAttribute("aria-expanded", "false");
@@ -251,7 +279,13 @@
     const renderCalendar = () => {
       const year = visibleMonth.getFullYear();
       const month = visibleMonth.getMonth();
-      monthLabel.textContent = visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      monthSelect.value = String(month);
+      yearSelect.value = String(year);
+      // Months after the current one are unreachable in the current year.
+      Array.from(monthSelect.options).forEach((option) => {
+        option.disabled = year === today.getFullYear() && Number(option.value) > today.getMonth();
+      });
+      previous.disabled = year === today.getFullYear() - 100 && month === 0;
       next.disabled = visibleMonth.getFullYear() === today.getFullYear()
         && visibleMonth.getMonth() === today.getMonth();
       grid.querySelectorAll(".date-picker-day, .date-picker-blank").forEach((item) => item.remove());
@@ -285,9 +319,24 @@
         grid.append(dayButton);
       }
     };
-    previous.addEventListener("click", () => {
-      visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
+    const selectVisibleMonth = () => {
+      const year = Number(yearSelect.value);
+      const month = Number(monthSelect.value);
+      // Picking a past year while a later month is showing could land in the future.
+      const latestAllowed = new Date(today.getFullYear(), today.getMonth(), 1);
+      const chosen = new Date(year, month, 1);
+      visibleMonth = chosen > latestAllowed ? latestAllowed : chosen;
       renderCalendar();
+    };
+    monthSelect.addEventListener("change", selectVisibleMonth);
+    yearSelect.addEventListener("change", selectVisibleMonth);
+    previous.addEventListener("click", () => {
+      const earliestAllowed = new Date(today.getFullYear() - 100, 0, 1);
+      const previousMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
+      if (previousMonth >= earliestAllowed) {
+        visibleMonth = previousMonth;
+        renderCalendar();
+      }
     });
     next.addEventListener("click", () => {
       const latestAllowed = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -302,10 +351,7 @@
         closeCalendar();
         return;
       }
-      const selectedDate = parseDate(input.value);
-      visibleMonth = selectedDate
-        ? new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
-        : new Date(today.getFullYear(), today.getMonth(), 1);
+      visibleMonth = clampMonth(parseDate(input.value) || today);
       renderCalendar();
       calendar.hidden = false;
       toggle.setAttribute("aria-expanded", "true");
@@ -487,12 +533,16 @@
     });
   });
 
+  const TOAST_VISIBLE_MS = 4000;
   document.querySelectorAll("[data-toast]").forEach((toast) => {
+    // One source of truth: the countdown bar animates for exactly as long
+    // as the toast stays on screen.
+    toast.style.setProperty("--toast-duration", `${TOAST_VISIBLE_MS}ms`);
     const dismiss = () => {
       toast.classList.add("is-leaving");
       window.setTimeout(() => toast.remove(), 220);
     };
-    const timer = window.setTimeout(dismiss, 4000);
+    const timer = window.setTimeout(dismiss, TOAST_VISIBLE_MS);
     toast.querySelector(".toast-dismiss")?.addEventListener("click", () => {
       window.clearTimeout(timer);
       dismiss();

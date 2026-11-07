@@ -13,11 +13,11 @@
 {% if about_images %}
 <section class="about-gallery" aria-label="About page photos">
   <div class="about-gallery-grid">
-    {% for item in about_images %}
+    {% for item in about_images %}{% if item.image %}
       <figure class="about-gallery-item about-gallery-item-{{ forloop.counter }}">
         <img src="{{ item.image.url }}" alt="{{ item.alt_text }}" loading="lazy">
       </figure>
-    {% endfor %}
+    {% endif %}{% endfor %}
   </div>
 </section>
 {% endif %}

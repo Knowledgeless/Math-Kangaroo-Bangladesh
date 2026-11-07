@@ -17,8 +17,14 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.audit.models import AuditLog
-from apps.competitions.models import CompetitionDivision, CompetitionLevel, CompetitionSeason, Syllabus
-from .admin import AnnouncementAdmin
+from apps.competitions.models import (
+    CompetitionDivision,
+    CompetitionLevel,
+    CompetitionSeason,
+    Syllabus,
+    SyllabusTopic,
+)
+from .admin import AnnouncementAdmin, AnnouncementImageInline
 from .forms import AboutPageForm, AnnouncementImageForm, HeroSlideForm, QuestionPaperForm
 from .models import (
     AboutPage,
@@ -404,6 +410,262 @@ class ContentWorkflowTests(TestCase):
             self.assertContains(self.client.get(reverse("announcement-list")), "Students solving a problem")
             self.assertContains(self.client.get(reverse("home")), "Students solving a problem")
 
+    def _announcement_post(self, **image_fields):
+        data = {
+            "title": "Photo-less update",
+            "slug": "photo-less-update",
+            "summary": "An update.",
+            "content": "Details.",
+            "category": "competition",
+            "images-TOTAL_FORMS": "1",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "1000",
+            "images-0-display_order": "0",
+            "action": "publish",
+        }
+        data.update(image_fields)
+        return data
+
+    def test_image_row_without_a_file_is_rejected_instead_of_saved_empty(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("cms-announcement-create"),
+            self._announcement_post(**{"images-0-alt_text": "Photo I forgot to attach"}),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Choose an image file for this row")
+        self.assertFalse(Announcement.objects.filter(slug="photo-less-update").exists())
+        self.assertFalse(AnnouncementImage.objects.exists())
+
+    def test_blank_image_row_is_ignored_and_announcement_saves(self):
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("cms-announcement-create"), self._announcement_post())
+        self.assertRedirects(response, reverse("cms-dashboard"))
+        announcement = Announcement.objects.get(slug="photo-less-update")
+        self.assertEqual(announcement.images.count(), 0)
+
+    def test_existing_image_is_kept_when_editing_without_a_new_upload(self):
+        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+            self.client.force_login(self.user)
+            self.client.post(
+                reverse("cms-announcement-create"),
+                self._announcement_post(**{
+                    "images-0-image": uploaded_test_image("kept.jpg"),
+                    "images-0-alt_text": "Original photo",
+                }),
+            )
+            announcement = Announcement.objects.get(slug="photo-less-update")
+            image = announcement.images.get()
+            response = self.client.post(
+                reverse("cms-announcement-edit", args=[announcement.pk]),
+                self._announcement_post(**{
+                    "summary": "Edited summary.",
+                    "images-INITIAL_FORMS": "1",
+                    "images-0-id": str(image.pk),
+                    "images-0-announcement": str(announcement.pk),
+                    "images-0-alt_text": "Updated alt text",
+                }),
+            )
+            self.assertRedirects(response, reverse("cms-dashboard"))
+            image.refresh_from_db()
+            self.assertEqual(image.alt_text, "Updated alt text")
+            self.assertTrue(image.image.name.startswith("announcements/kept"))
+
+    def test_admin_inline_rejects_an_image_row_that_has_no_file(self):
+        # The Django Admin inline is a second way in, so it needs the same guard
+        # as the content desk: a row with alt text but no file must not be saved.
+        inline = AnnouncementImageInline(Announcement, AdminSite())
+        request = RequestFactory().get("/")
+        request.user = User.objects.create_superuser(
+            username="siteadmin0001", email="admin@example.org", password="Sensible-family-pass-849!"
+        )
+        formset_class = inline.get_formset(request)
+        management = {
+            "images-TOTAL_FORMS": "1",
+            "images-INITIAL_FORMS": "0",
+            "images-MIN_NUM_FORMS": "0",
+            "images-MAX_NUM_FORMS": "1000",
+            "images-0-display_order": "0",
+        }
+        filled_in = formset_class(data={**management, "images-0-alt_text": "Alt without a file"}, files={})
+        self.assertFalse(filled_in.is_valid())
+        self.assertIn("image", filled_in.errors[0])
+        blank_extra_row = formset_class(data={**management, "images-0-alt_text": ""}, files={})
+        self.assertTrue(blank_extra_row.is_valid())
+
+    def test_public_pages_skip_image_rows_that_have_no_file(self):
+        # Rows saved without a file by older code must not break public pages.
+        announcement = Announcement.objects.create(
+            title="Legacy row",
+            slug="legacy-row",
+            summary="Has an image row without a file.",
+            content="Body.",
+            status=PublicationStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        AnnouncementImage.objects.create(announcement=announcement, image="", alt_text="Missing file")
+        for url in (reverse("announcement-list"), reverse("home"), announcement.get_absolute_url()):
+            response = self.client.get(url)
+            self.assertContains(response, "Legacy row")
+            self.assertNotContains(response, "Missing file")
+
+    def _grant(self, *codenames):
+        self.user.user_permissions.add(
+            *Permission.objects.filter(codename__in=codenames)
+        )
+        self.user = User.objects.get(pk=self.user.pk)
+
+    def test_content_desk_rows_offer_edit_archive_and_delete_icons(self):
+        self._grant("delete_announcement", "view_faq", "change_faq", "delete_faq")
+        announcement = Announcement.objects.create(
+            title="Icon row",
+            slug="icon-row",
+            summary="Shown in the content desk.",
+            content="Body.",
+            status=PublicationStatus.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        category = FAQCategory.objects.create(name="Families", slug="families")
+        faq = FAQ.objects.create(category=category, question="Icon FAQ?", answer="Yes.")
+        self.client.force_login(self.user)
+        page = self.client.get(reverse("cms-dashboard")).content.decode()
+        for url in (
+            reverse("cms-announcement-edit", args=[announcement.pk]),
+            reverse("cms-announcement-archive", args=[announcement.pk]),
+            reverse("cms-announcement-delete", args=[announcement.pk]),
+            reverse("cms-faq-edit", args=[faq.pk]),
+            reverse("cms-faq-archive", args=[faq.pk]),
+            reverse("cms-faq-delete", args=[faq.pk]),
+        ):
+            self.assertIn(url, page)
+        # The controls are icons only, with the wording left to assistive text.
+        for icon in ("bi bi-pencil", "bi bi-archive", "bi bi-trash"):
+            self.assertIn(icon, page)
+        self.assertNotIn(">Edit</a>", page)
+        self.assertNotIn(">Archive</button>", page)
+
+    def test_archive_and_delete_actions_refuse_get_and_need_permission(self):
+        announcement = Announcement.objects.create(
+            title="Guarded", slug="guarded", summary="s", content="c"
+        )
+        category = FAQCategory.objects.create(name="Families", slug="families")
+        faq = FAQ.objects.create(category=category, question="Guarded?", answer="Yes.")
+        actions = (
+            ("cms-announcement-archive", announcement.pk),
+            ("cms-announcement-delete", announcement.pk),
+            ("cms-faq-archive", faq.pk),
+            ("cms-faq-delete", faq.pk),
+        )
+        # Without the matching permission the action is refused outright.
+        onlooker = User.objects.create_user(username="onlooker0001", password="Sensible-family-pass-849!")
+        self.client.force_login(onlooker)
+        for name, pk in actions:
+            self.assertEqual(self.client.post(reverse(name, args=[pk])).status_code, 403)
+
+        # With permission, a plain link visit still must not change anything:
+        # every archive and delete action is POST only.
+        self._grant("delete_announcement", "view_faq", "change_faq", "delete_faq")
+        self.client.force_login(self.user)
+        for name, pk in actions:
+            self.assertEqual(self.client.get(reverse(name, args=[pk])).status_code, 404)
+        self.assertTrue(Announcement.objects.filter(pk=announcement.pk).exists())
+        self.assertTrue(FAQ.objects.filter(pk=faq.pk).exists())
+
+    def test_archiving_keeps_the_record_and_deleting_removes_it(self):
+        self._grant("delete_announcement", "view_faq", "change_faq", "delete_faq")
+        self.client.force_login(self.user)
+        category = FAQCategory.objects.create(name="Families", slug="families")
+        faq = FAQ.objects.create(category=category, question="Archive me?", answer="Yes.")
+        response = self.client.post(reverse("cms-faq-archive", args=[faq.pk]))
+        self.assertRedirects(response, reverse("cms-dashboard"))
+        faq.refresh_from_db()
+        self.assertEqual(faq.status, PublicationStatus.ARCHIVED)
+        self.assertTrue(AuditLog.objects.filter(action="faq.archived", object_id=str(faq.pk)).exists())
+
+        announcement = Announcement.objects.create(
+            title="Delete me", slug="delete-me", summary="s", content="c"
+        )
+        announcement_pk = announcement.pk
+        response = self.client.post(reverse("cms-announcement-delete", args=[announcement_pk]))
+        self.assertRedirects(response, reverse("cms-dashboard"))
+        self.assertFalse(Announcement.objects.filter(pk=announcement_pk).exists())
+        # The audit trail outlives the record it describes.
+        self.assertTrue(
+            AuditLog.objects.filter(action="announcement.deleted", object_id=str(announcement_pk)).exists()
+        )
+
+    def test_deleting_an_announcement_also_removes_its_uploaded_images(self):
+        self._grant("delete_announcement")
+        with TemporaryDirectory() as media_directory, override_settings(MEDIA_ROOT=media_directory):
+            announcement = Announcement.objects.create(
+                title="With photo", slug="with-photo", summary="s", content="c"
+            )
+            image = AnnouncementImage.objects.create(
+                announcement=announcement,
+                image=uploaded_test_image("doomed.jpg"),
+                alt_text="Doomed photo",
+            )
+            stored = Path(media_directory) / image.image.name
+            self.assertTrue(stored.exists())
+            self.client.force_login(self.user)
+            self.client.post(reverse("cms-announcement-delete", args=[announcement.pk]))
+            self.assertFalse(AnnouncementImage.objects.filter(pk=image.pk).exists())
+            self.assertFalse(stored.exists())
+
+    def test_announcement_slug_is_built_from_the_title_and_never_asked_for(self):
+        self.client.force_login(self.user)
+        page = self.client.get(reverse("cms-announcement-create"))
+        # Staff never see or fill a slug field.
+        self.assertNotContains(page, 'name="slug"')
+        response = self.client.post(
+            reverse("cms-announcement-create"),
+            {
+                "title": "Registration Opens In March",
+                "summary": "Applications are open.",
+                "content": "Families can now register.",
+                "category": "registration",
+                "action": "publish",
+            },
+        )
+        self.assertRedirects(response, reverse("cms-dashboard"))
+        announcement = Announcement.objects.get(title="Registration Opens In March")
+        self.assertEqual(announcement.slug, "registration-opens-in-march")
+
+        # A second announcement with the same title still gets its own address.
+        twin = Announcement.objects.create(
+            title="Registration Opens In March", summary="s", content="c"
+        )
+        self.assertEqual(twin.slug, "registration-opens-in-march-2")
+
+        # Renaming must not move an address that is already published.
+        announcement.title = "A Completely Different Title"
+        announcement.save()
+        announcement.refresh_from_db()
+        self.assertEqual(announcement.slug, "registration-opens-in-march")
+
+    def test_a_title_with_no_latin_letters_still_gets_a_usable_slug(self):
+        # Slugifying Bengali yields an empty string, which would break the URL.
+        first = Announcement.objects.create(title="গণিত অলিম্পিয়াড", summary="s", content="c")
+        second = Announcement.objects.create(title="আরেকটি শিরোনাম", summary="s", content="c")
+        self.assertEqual(first.slug, "announcement")
+        self.assertEqual(second.slug, "announcement-2")
+        self.assertEqual(first.get_absolute_url(), "/announcements/announcement/")
+
+    def test_required_fields_are_starred_and_optional_ones_are_not(self):
+        self.client.force_login(self.user)
+        page = self.client.get(reverse("cms-announcement-create")).content.decode()
+        star = '<span class="required-mark" aria-hidden="true">*</span>'
+        # Required: title, summary, content, category.
+        self.assertIn("Title" + star, page)
+        self.assertIn("Summary" + star, page)
+        self.assertIn("Content" + star, page)
+        # Optional: the cover image and search-engine fields carry no star.
+        self.assertIn("Cover image url</label>", page)
+        self.assertIn("Meta title</label>", page)
+        self.assertNotIn("Cover image url" + star, page)
+        self.assertNotIn("Meta title" + star, page)
+
     def test_staff_can_reach_older_announcements_through_pagination(self):
         self.client.force_login(self.user)
         for index in range(11):
@@ -716,6 +978,64 @@ class NewContentManagementTests(TestCase):
         self.assertContains(public_page, "Patterns")
         self.assertContains(public_page, "Explore repeating patterns.")
 
+    def test_syllabus_and_question_paper_rows_can_be_archived_and_deleted(self):
+        # The uploaded PDF is kept in a throwaway root so the real one is untouched.
+        private_directory = TemporaryDirectory()
+        self.addCleanup(private_directory.cleanup)
+        storage_settings = override_settings(PRIVATE_MEDIA_ROOT=private_directory.name)
+        storage_settings.enable()
+        self.addCleanup(storage_settings.disable)
+        season = CompetitionSeason.objects.create(name="2026 Olympiad", year=2026, slug="2026")
+        level = CompetitionLevel.objects.create(
+            name="CMS Test Benjamin", code="benjamin-test", min_grade=5, max_grade=6
+        )
+        division = CompetitionDivision.objects.create(season=season, level=level, grade=5)
+        syllabus = Syllabus.objects.create(division=division, title="Grade 5 mathematics")
+        SyllabusTopic.objects.create(syllabus=syllabus, topic="Fractions")
+        paper = QuestionPaper.objects.create(
+            title="2026 Benjamin Questions",
+            year=2026,
+            category="Benjamin",
+            pdf_file=SimpleUploadedFile("benjamin-2026.pdf", b"%PDF-1.4\nbenjamin"),
+        )
+        self.user.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label__in=("cms", "competitions"),
+                codename__in=("delete_syllabus", "delete_questionpaper"),
+            )
+        )
+        self.client.force_login(User.objects.get(pk=self.user.pk))
+
+        page = self.client.get(reverse("cms-dashboard")).content.decode()
+        for url in (
+            reverse("cms-syllabus-archive", args=[syllabus.pk]),
+            reverse("cms-syllabus-delete", args=[syllabus.pk]),
+            reverse("cms-question-paper-archive", args=[paper.pk]),
+            reverse("cms-question-paper-delete", args=[paper.pk]),
+        ):
+            self.assertIn(url, page)
+
+        self.assertRedirects(
+            self.client.post(reverse("cms-syllabus-archive", args=[syllabus.pk])),
+            reverse("cms-dashboard"),
+        )
+        syllabus.refresh_from_db()
+        self.assertEqual(syllabus.status, Syllabus.Status.ARCHIVED)
+
+        topic_count = SyllabusTopic.objects.filter(syllabus=syllabus).count()
+        self.assertEqual(topic_count, 1)
+        self.client.post(reverse("cms-syllabus-delete", args=[syllabus.pk]))
+        self.assertFalse(Syllabus.objects.filter(pk=syllabus.pk).exists())
+        self.assertEqual(SyllabusTopic.objects.filter(syllabus_id=syllabus.pk).count(), 0)
+        # Deleting a syllabus must not take its competition division with it.
+        self.assertTrue(CompetitionDivision.objects.filter(pk=division.pk).exists())
+
+        stored = Path(paper.pdf_file.path)
+        self.assertTrue(stored.exists())
+        self.client.post(reverse("cms-question-paper-delete", args=[paper.pk]))
+        self.assertFalse(QuestionPaper.objects.filter(pk=paper.pk).exists())
+        self.assertFalse(stored.exists())
+
     def test_content_editor_group_includes_the_new_frontend_management_permissions(self):
         editor = Group.objects.get(name="Content Editor")
         editor_permissions = set(editor.permissions.values_list("codename", flat=True))
@@ -783,6 +1103,30 @@ class QuestionPaperPrivateStorageTests(TestCase):
             404,
         )
         self.assertEqual(self.client.get("/media/hero-slides/hero.jpg").status_code, 200)
+
+    def test_media_url_refuses_hidden_files(self):
+        (self.media_root / "hero-slides").mkdir(parents=True)
+        (self.media_root / ".htaccess").write_text("Options -Indexes")
+        (self.media_root / "hero-slides" / ".secret").write_text("hidden")
+        self.assertEqual(self.client.get("/media/.htaccess").status_code, 404)
+        self.assertEqual(self.client.get("/media/hero-slides/.secret").status_code, 404)
+
+    def test_uploaded_names_keep_a_single_extension(self):
+        # FileField.generate_filename is the path every form upload takes.
+        for model, expected in (
+            (HeroSlide, "hero-slides/shell_php.jpg"),
+            (AnnouncementImage, "announcements/shell_php.jpg"),
+            (AboutPageImage, "about-page/shell_php.jpg"),
+        ):
+            field = model._meta.get_field("image")
+            self.assertEqual(field.generate_filename(None, "shell.php.jpg"), expected)
+        paper = QuestionPaper.objects.create(
+            title="Double extension",
+            year=2026,
+            category="Cadet",
+            pdf_file=SimpleUploadedFile("paper.php.pdf", b"%PDF-1.4\nx"),
+        )
+        self.assertEqual(paper.pdf_file.name, "question-papers/paper_php.pdf")
 
     def test_content_desk_edit_page_renders_for_a_private_pdf(self):
         paper = self.create_paper()

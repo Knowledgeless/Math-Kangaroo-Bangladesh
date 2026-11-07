@@ -1,6 +1,198 @@
 # Math Kangaroo Bangladesh — Project progress
 
-Last updated: 2026-11-04
+Last updated: 2026-11-07
+
+## Completed work — required-field marks, automatic slugs, title case and toast countdown
+
+### Required fields are marked
+
+- Every form field label now shows a small red `*` when the field is required, through one
+  shared snippet and the `.required-mark` style. Optional fields show nothing, so
+  "Student phone (optional)" and the cover-image and search-engine fields stay bare.
+- Covers the content desk and all of its pages (announcement, FAQ, syllabus, question paper,
+  About, website details), signup, and the remaining account forms (login, profile, annual
+  registration, staff user, password reset) so the whole site reads the same way.
+- The announcement and About photo rows sit under an "optional photos" heading but their
+  fields are required once a row is started. Their help text now says exactly that, so the
+  new stars do not read as "you must add a photo".
+
+### Slug is no longer asked for
+
+- Removed the slug field from the announcement form. `Announcement.save()` builds one from the
+  title on first save only, so an address that is already published never moves when the title
+  is later edited.
+- Repeated titles get `-2`, `-3` and so on. A title with no Latin letters (Bengali, for
+  example) slugifies to an empty string, so it falls back to `announcement`, `announcement-2`.
+- The content desk still shows each announcement's slug beneath its title, as it is the page's
+  web address.
+
+### Titles read in title case
+
+- Done with CSS `text-transform: capitalize` on headings (`h1`–`h6`) plus content titles in the
+  content desk tables and lists, related-story links, and the homepage benefit and registration
+  detail titles.
+- CSS was chosen over Django's `title` filter, which lowercases the rest of every word and
+  would turn "PDF" into "Pdf" and "FAQ" into "Faq". CSS capitalize leaves the rest of each word
+  alone and does not touch the saved text. Checked in Chromium: `PDF`, `FAQ`, `Let's` and
+  `Écolier` all survive.
+- For that reason the `{{ announcement.title | title }}` filter added by hand to
+  `announcement_detail.html` was replaced with the plain value; the shared CSS now covers it.
+- Deliberately not applied to every `<strong>`, because those also carry data such as email
+  addresses, usernames and school names, which must stay as entered. `.no-title-case` is
+  available to opt a heading out.
+
+### Toast notifications count down
+
+- Each toast now has a bar along its bottom edge that shrinks over the four seconds before the
+  toast dismisses itself. It takes `currentColor`, so it is green, red, amber or blue to match
+  a success, error, warning or info message.
+- The four-second figure lives in `site.js` only and is passed to the CSS as
+  `--toast-duration`, so the bar and the timer cannot drift apart. The bar holds still under
+  `prefers-reduced-motion`.
+
+### Verification
+
+- 99 application tests, including new coverage for the required marks on the content desk and
+  signup, slug generation (from title, duplicates, non-Latin titles, stability on rename), and
+  a countdown bar on each of the four toast types.
+- Rendered in headless Chromium: signup, homepage, announcements, the announcement form, the
+  content desk tables, and the four toast types in both light and dark themes.
+- The two previously recorded `accounts` test failures are unchanged.
+
+## Completed work — birthdate year/month selection and content desk row actions
+
+### Date of birth picker
+
+The signup calendar only had previous/next month arrows, so reaching a student's birth year
+meant roughly 150 clicks.
+
+- The month name is now a month dropdown and a year dropdown, so a birth date is three
+  choices. The arrows still step one month at a time.
+- The year list covers the current year back 100 years, newest first, because a student's
+  birth year sits near the top.
+- Future dates stay unreachable: months after the current one are disabled while the current
+  year is shown, and the dropdowns cannot move past this month. The shown month is clamped
+  into range, so a saved date outside the list still opens sensibly.
+- Verified in a real DOM with jsdom: 12 months, 101 years, picking year then month then day
+  fills the field as `YYYY-MM-DD`, future months are disabled, and reopening returns to the
+  saved month. Also rendered in headless Chromium to confirm the layout.
+
+### Content desk row actions
+
+Every row in the content desk now offers edit, archive and delete as icon-only controls
+(pencil, archive box, red trash). The wording lives in `aria-label` and `title` only.
+
+- Added the missing actions: archive and delete for FAQs, archive and delete for syllabuses,
+  delete for announcements, delete for question papers.
+- All six new views are POST-only and permission-gated (`delete_announcement`, `change_faq`,
+  `delete_faq`, `change_syllabus`, `delete_syllabus`, `delete_questionpaper`), matching the
+  existing archive views. Each one writes an audit event; for deletes the event is written
+  first, so the audit trail outlives the record.
+- Deleting also removes the uploaded files: announcement images, and a question paper's PDF
+  from private storage. Deleting a syllabus removes its topics but keeps its competition
+  division.
+- Archive is hidden on rows that are already archived. Delete asks for confirmation first.
+- `.table-actions` no longer flattens `.action-icon` controls into plain text links, so the
+  icon buttons keep their pill styling; `.cms-actions` lays them out in a row.
+- Verified: 54 CMS tests and 95 application tests, plus headless Chromium renders of the
+  table rows and the FAQ list rows.
+
+## Completed work — announcement image rows without a file
+
+Visiting `/announcements/` raised `ValueError: The 'image' attribute has no file associated with it.`
+An `AnnouncementImage` row had been saved with an empty `image`, and the public templates
+asked that row for `image.url`.
+
+- **Cause:** the announcement image field was `required=False`, so a row with alt text but no
+  chosen file was accepted and stored with an empty `image`. Both the content desk and the
+  Django Admin inline could create one.
+- The image field is now required. An existing row keeps its current file when the announcement
+  is edited without a new upload, and a completely blank extra row is still ignored, so saving an
+  announcement with no images works as before.
+- The public announcement list, homepage and announcement detail views prefetch through
+  `_public_images()`, which excludes rows with no file. The About page filters its gallery the
+  same way.
+- The public templates also check `image.image` before reading `image.url`, so a row without a
+  file can never raise again if a future view forgets to filter.
+- Existing empty rows stay in the database and are simply not rendered. Because the field is now
+  required, opening such an announcement in the content desk or Admin asks for a file for that
+  row, or for the row to be removed, before it will save.
+- Verified: 49 CMS tests, 90 application tests, and the live `/`, `/announcements/`,
+  `/announcements/<slug>/` and `/about/` pages against the development database, which still
+  holds one such empty row.
+
+Note: run the suite as `python manage.py test apps`. Plain `manage.py test` also discovers the
+project a second time as `MathKangaroo.apps.*` and reports three import errors that are a test
+loader artifact, not real failures.
+
+## Completed work — cPanel deployment for https://kangaroomathbd.org/
+
+### Production settings
+
+- `MathKangaroo/settings.py` reads the environment plus an optional `.env` file. Values are taken literally, and the real environment wins over the file.
+- Production defaults:
+  - allowed hosts `kangaroomathbd.org` and `www.kangaroomathbd.org`, with matching `https://` CSRF origins;
+  - PostgreSQL, with an optional `DB_SSLMODE`.
+- Production refuses to start when:
+  - the secret key is missing;
+  - a host is given as a URL;
+  - the database is not PostgreSQL;
+  - both email SSL and TLS are enabled;
+  - private media sits inside a web-served folder.
+- `passenger_wsgi.py` is the cPanel startup file. It always forces `DEBUG` off for the live site.
+- Static files use WhiteNoise's hashed manifest in production. The vendored bootstrap-icons CSS no longer points to a missing `.woff` file.
+- Logging:
+  - production logs go to a file;
+  - unknown-host requests are logged as one line and never emailed;
+  - server errors are emailed to `DJANGO_ADMINS`.
+
+### Uploads and question papers
+
+- **Security fix:** question-paper PDFs now use `PrivateMediaStorage` under `DJANGO_PRIVATE_MEDIA_ROOT`, outside `public_html`. Draft PDFs were previously downloadable at `/media/question-papers/<name>`. Migration `cms.0010_questionpaper_private_storage` changes no database schema.
+- The `/media/` fallback view refuses `question-papers/` and hidden files, including when dot segments are used.
+- Public uploads keep only their last extension (`shell.php.jpg` is saved as `shell_php.jpg`), so cPanel's PHP handlers can never run an uploaded image.
+
+### Deployment files in `deploy/cpanel/`
+
+- `README.md` is the step-by-step runbook.
+- `production.env.example` is the `.env` template with the domain, PostgreSQL and mail settings filled in.
+- `deploy.sh`:
+  - checks the `.env` file;
+  - installs packages;
+  - connects to the database and enforces PostgreSQL 14+;
+  - creates private folders without ever locking the home folder or document root;
+  - runs `check --deploy`;
+  - backs up the database before migrations;
+  - migrates;
+  - collects static files and installs the `.htaccess` rules;
+  - restarts the app.
+- `backup.sh` serves deploys and the nightly cron job. It checks the `pg_dump` and server versions.
+- `.htaccess` templates:
+  - one canonical `https://kangaroomathbd.org/` (www and HTTP redirect there in one step, with AutoSSL paths exempt);
+  - no directory listings;
+  - script-like media files refused wherever the extension appears in the name;
+  - year-long cache headers for hashed static files.
+
+### Verification
+
+- Test suite on Python 3.10 with real PostgreSQL 16/18.
+- Repeated end-to-end `deploy.sh` rehearsals in a simulated cPanel account, covering:
+  - PostgreSQL 13 refusal;
+  - a wrong password;
+  - first deploy;
+  - rerun;
+  - unsafe log paths;
+  - backup and restore.
+- `.htaccess` behaviour on real Apache 2.4, including a cPanel-style PHP handler for the double-extension test.
+- shellcheck on both scripts.
+- Not tested: real LiteSpeed and real Passenger, which are unavailable locally.
+
+### Before going live
+
+- Confirm the host's PostgreSQL is 14 or newer; Django 5.2 requires it, and stock cPanel often ships 10 or 13. See the runbook.
+- Two `accounts` tests were already failing before this work and still fail:
+  - `test_registration_statistics_use_live_data_and_staff_shell`;
+  - `test_staff_user_dashboard_searches_all_requested_fields_and_shows_stats`.
 
 ## Completed work — locally bundled site typography
 
@@ -94,7 +286,7 @@ Use `Math_Kangaroo_Bangladesh_Django_Blueprint.md` as the architecture source of
 ### Platform foundation
 
 - Django project with focused `accounts`, `audit`, `competitions`, `cms`, and `core` apps.
-- Environment-driven configuration, SQLite for local development, PostgreSQL for non-debug deployments, Asia/Dhaka timezone, configurable email, and production security settings.
+- Environment-driven configuration (`.env` supported), SQLite for local development, PostgreSQL 14+ for production, Asia/Dhaka timezone, configurable email, production security settings, and the cPanel deployment kit in `deploy/cpanel/`.
 - Custom error pages, static assets, environment example, README, and project-specific Copilot instructions.
 - Least-privilege content-editor, publisher, competition-manager, and auditor groups; append-only audit events and permission-gated staff workflows.
 
@@ -134,7 +326,7 @@ Use `Math_Kangaroo_Bangladesh_Django_Blueprint.md` as the architecture source of
 
 - `python manage.py check` — passed.
 - `python manage.py makemigrations --check --dry-run` — no model changes pending.
-- `python manage.py test apps.accounts.tests apps.cms.tests apps.competitions.tests` — 63 tests passed.
+- `python manage.py test apps.core.tests apps.accounts.tests apps.cms.tests apps.competitions.tests` — 85 tests; 83 pass. The 2 `accounts` failures predate the deployment work (see above).
 - `node --check static/js/site.js` — passed.
 - CMS migration `0009_aboutpageimage_announcementimage` — applied to the local database.
 - Updated dashboard templates compiled successfully.
@@ -149,15 +341,15 @@ Use `Math_Kangaroo_Bangladesh_Django_Blueprint.md` as the architecture source of
 5. Add organizations, schools, centers, coordinator assignments, and session scheduling with object-level scoping.
 6. Add fees/discounts and an abstract payment gateway with verified webhooks, idempotency, and immutable payment records. Never store card data.
 7. Implement validated CSV/XLSX result import preview/approval, rankings, publication controls, awards, and certificate verification.
-8. Add notification templates and asynchronous email/PDF processing only when deployment needs are established; complete PostgreSQL/production integration, backups/restore, rate limiting, dependency/security review, accessibility/performance audits, and a deployment runbook.
+8. Add notification templates and asynchronous email/PDF processing only when deployment needs are established; add rate limiting, an off-server backup and restore drill, dependency/security review, and accessibility/performance audits. The PostgreSQL production setup, backups and cPanel runbook are done.
 
 ## Local development notes
 
 - Work from this directory; `manage.py`, the blueprint, and this file are at the Django project root.
 - Local startup: activate `.venv`, then run `python manage.py migrate`, `python manage.py createsuperuser`, and `python manage.py runserver`.
 - Staff groups are created after migrations. Assign groups in `/admin/`; `is_staff` alone is not application authorization.
-- Default local settings use SQLite. Production fails closed unless `DJANGO_DEBUG=false`, `DJANGO_SECRET_KEY` is set, and `DB_ENGINE=postgresql` is selected.
+- Default local settings use SQLite with DEBUG on. Production (any `DJANGO_DEBUG=false` process; `passenger_wsgi.py` always forces it) fails closed without `DJANGO_SECRET_KEY` and PostgreSQL. Deployment is described in `deploy/cpanel/README.md`.
 - The current implementation seeds the 2027 season as open. Configure actual dates and profile-edit windows through the season in Django Admin before relying on them operationally.
 - Before applying the username migration to an existing installation, make a database backup and review its effects on legacy users/login instructions.
-- Main validation command: `python manage.py test apps.accounts.tests apps.cms.tests apps.competitions.tests`.
+- Main validation command: `python manage.py test apps.core.tests apps.accounts.tests apps.cms.tests apps.competitions.tests`.
 - Do not add generic arbitrary HTML content or expose internal exam questions. Prefer typed content, validated URLs, and explicit publication states.
