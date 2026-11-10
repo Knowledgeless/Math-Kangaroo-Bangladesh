@@ -14,7 +14,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # management commands run from the cPanel Terminal see the same configuration
 # as the Passenger web process.
 
-ENV_FILE = Path(os.environ.get("DJANGO_ENV_FILE") or BASE_DIR / ".env")
+_env_file = Path(os.environ.get("DJANGO_ENV_FILE") or BASE_DIR / ".env").expanduser()
+if not _env_file.is_absolute():
+    _env_file = BASE_DIR / _env_file
+ENV_FILE = _env_file.resolve()
 if ENV_FILE.is_file():
     from dotenv import load_dotenv
 
@@ -132,8 +135,10 @@ WSGI_APPLICATION = 'MathKangaroo.wsgi.application'
 
 
 # --- Database --------------------------------------------------------------
-# Production uses PostgreSQL 14 or newer (Django 5.2's minimum). SQLite is
+# Production uses PostgreSQL 13 or newer (Django 5.1's minimum). SQLite is
 # only for local development; production refuses to start with anything else.
+# Django is pinned to 5.1 in requirements.txt because 5.2 would require
+# PostgreSQL 14; see deploy/cpanel/README.md.
 
 DB_ENGINE = env("DB_ENGINE", "sqlite" if DEBUG else "postgresql").lower()
 DB_CONN_MAX_AGE = env_int("DB_CONN_MAX_AGE", 60)

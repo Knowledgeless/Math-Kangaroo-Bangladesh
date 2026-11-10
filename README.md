@@ -4,7 +4,11 @@ A server-rendered Django competition website foundation with a custom public fro
 
 ## Run locally
 
-Use Python 3.10 or newer (3.12+ recommended) with Django 5.2.
+Use **Python 3.10–3.13** (3.13 recommended) with Django 5.1. Python 3.14 does
+not work: Django is pinned to 5.1 so the site can run on the host's
+PostgreSQL 13, and 5.1 does not support 3.14. See
+[deploy/cpanel/README.md](deploy/cpanel/README.md#check-the-postgresql-version-first)
+for the reasoning and how to move back to Django 5.2 later.
 
 ```bash
 python -m venv .venv

@@ -22,6 +22,7 @@ Files in this folder:
 | `production.env.example` | Template for the production `.env` |
 | `deploy.sh` | One-command deploy and update: packages, checks, backup, migrations, static files, restart |
 | `backup.sh` | Database backup, used by `deploy.sh` and by the nightly cron job |
+| `retire-wordpress.sh` | Moves an existing WordPress site out of the document root so Django answers `/` |
 | `htaccess-document-root.txt` | Block to paste into the document root `.htaccess`: HTTPS and www redirects, no directory listings |
 | `htaccess-static.txt`, `htaccess-media.txt` | Installed automatically by `deploy.sh` |
 
@@ -31,10 +32,13 @@ The project root also has `passenger_wsgi.py`, the startup file cPanel loads.
 
 You need:
 
-- **Setup Python App** in cPanel, offering Python 3.10 or newer. Pick the
-  newest version offered; 3.12 or later is recommended.
+- **Setup Python App** in cPanel, offering **Python 3.10, 3.11, 3.12 or
+  3.13**. Pick 3.13 if it is offered. Do **not** pick Python 3.14: the site
+  runs on Django 5.1, which does not support it and breaks while rendering
+  pages. `deploy.sh` stops with a clear message if the virtualenv uses the
+  wrong Python.
 - **Terminal** in cPanel, or SSH access.
-- **PostgreSQL 14 or newer** in **cPanel › PostgreSQL Databases**. The site
+- **PostgreSQL 13 or newer** in **cPanel › PostgreSQL Databases**. The site
   does not run on MySQL. See [Check the PostgreSQL version](#check-the-postgresql-version-first).
 - `kangaroomathbd.org` and `www.kangaroomathbd.org` pointing at the account,
   with a certificate covering both.
@@ -47,11 +51,11 @@ The site runs at the root of the domain. A sub-folder URL such as
 
 ### Check the PostgreSQL version first
 
-Django 5.2 needs **PostgreSQL 14 or newer**. cPanel uses the PostgreSQL that
-ships with the server's operating system, which is often older:
+The site runs **Django 5.1**, which needs **PostgreSQL 13 or newer**. cPanel
+uses the PostgreSQL that ships with the server's operating system:
 
-- AlmaLinux/CloudLinux 8 ships 10.
-- AlmaLinux/CloudLinux 9 ships 13.
+- AlmaLinux/CloudLinux 9 ships 13 — this works.
+- AlmaLinux/CloudLinux 8 ships 10 — too old.
 
 To see your server's version, use either:
 
@@ -63,13 +67,20 @@ To see your server's version, use either:
   ```
 
 `deploy.sh` also prints the version, and stops with
-"PostgreSQL 14 or later is required" if it is too old.
+"PostgreSQL 13 or later is required" if it is too old.
 
-If the version is below 14, there are two options:
+> **Why Django 5.1 and not 5.2?** Django 5.2 refuses to start on anything
+> below PostgreSQL 14, so it cannot run on a server that offers 13.
+> `requirements.txt` therefore pins `Django>=5.1,<5.2`. Django 5.1 no longer
+> receives security releases, so move to Django 5.2 as soon as the host
+> offers PostgreSQL 14: change the pin in `requirements.txt` back to
+> `Django>=5.2,<5.3`, update the Python guard in `deploy.sh`, and redeploy.
 
-- **Ask the host for PostgreSQL 14 or newer.** Some hosts can install a
+If the version is below 13, there are two options:
+
+- **Ask the host for PostgreSQL 13 or newer.** Some hosts can install a
   newer version.
-- **Use an external managed PostgreSQL** (14 or newer). Put its host, port,
+- **Use an external managed PostgreSQL** (13 or newer). Put its host, port,
   name, user and password in `.env`, and set `DB_SSLMODE=require`. Ask the
   host to allow outgoing connections to that server's port, usually 5432;
   shared hosts often block them.
@@ -208,7 +219,41 @@ already filled in.
 
 `deploy.sh` refuses to run while any `<placeholder>` is left.
 
-### 5. Add the document-root `.htaccess` block
+### 5. Retire an existing WordPress site
+
+Skip this step if the document root is empty.
+
+Django answers the root of the domain, so nothing else may claim it. A
+WordPress install keeps `index.php` and a `# BEGIN WordPress` rewrite block in
+the document root; the web server serves those first, so `https://kangaroomathbd.org/`
+would keep showing WordPress however well Django is configured.
+
+Export the WordPress database first in **cPanel › phpMyAdmin** if its content
+still matters. The script does not touch the database.
+
+```bash
+source /home/CPANELUSER/virtualenv/mathkangaroo/3.12/bin/activate && cd /home/CPANELUSER/mathkangaroo
+bash deploy/cpanel/retire-wordpress.sh
+```
+
+It lists what it will move and asks you to type `retire` before changing
+anything. Run it with `DRY_RUN=1` first to see the list and stop.
+
+Nothing is deleted. The script:
+
+- moves WordPress's files and folders out of the document root into
+  `~/wordpress-retired-TIMESTAMP`, which the web server cannot reach;
+- leaves `static/`, `media/`, `.well-known/` and `cgi-bin/` in place, and
+  reports anything else it does not recognise instead of moving it;
+- removes the `# BEGIN WordPress` block, and those of the usual cache plugins,
+  from the document-root `.htaccess`, keeping cPanel's Passenger block and a
+  copy of the original;
+- prints the one-line command that puts everything back.
+
+The public site is WordPress until this runs and Django is deployed, so do
+step 7 straight afterwards.
+
+### 6. Add the document-root `.htaccess` block
 
 1. In **File Manager**, open the domain's document root. Turn on
    **Settings › Show Hidden Files**.
@@ -223,7 +268,7 @@ The block:
 - turns off directory listings;
 - refuses hidden files and source or database files.
 
-### 6. Run the deploy script
+### 7. Run the deploy script
 
 ```bash
 source /home/CPANELUSER/virtualenv/mathkangaroo/3.12/bin/activate && cd /home/CPANELUSER/mathkangaroo
@@ -232,10 +277,10 @@ bash deploy/cpanel/deploy.sh
 
 The script stops at the first problem and says what to fix. In order, it:
 
-1. checks the `.env` file;
+1. checks that the virtualenv uses Python 3.10-3.13, then checks the `.env` file;
 2. installs `requirements.txt`;
 3. confirms Django loads in production mode, connects to the database and
-   prints the PostgreSQL version (14+ required);
+   prints the PostgreSQL version (13+ required);
 4. creates the static, media, private-media, upload-temp and log folders,
    with the private ones readable only by your account;
 5. runs `manage.py check --deploy`;
@@ -245,12 +290,12 @@ The script stops at the first problem and says what to fix. In order, it:
 9. restarts the app, waits for it to reload, and requests the home page.
 
 `check --deploy` always prints two warnings. Both are intentional; see
-[Raise HSTS after a week](#8-raise-hsts-after-a-week).
+[Raise HSTS after a week](#9-raise-hsts-after-a-week).
 
 - `security.W005`: HSTS does not cover subdomains.
 - `security.W021`: the domain is not on the HSTS preload list.
 
-### 7. Create the first staff account
+### 8. Create the first staff account
 
 ```bash
 python manage.py createsuperuser
@@ -278,7 +323,7 @@ Then check the site:
       published.
 - [ ] A password-reset email arrives.
 
-### 8. Raise HSTS after a week
+### 9. Raise HSTS after a week
 
 Once the site has worked over HTTPS for about a week, set
 `DJANGO_SECURE_HSTS_SECONDS=31536000` in `.env`, then restart the app.
@@ -379,13 +424,17 @@ Server errors are also emailed to `DJANGO_ADMINS`.
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | "Web application could not be started", or a 500 on every page | Settings refused to load: a `.env` value is missing or wrong, or a package is missing | Run `python -c "import passenger_wsgi"` and `python manage.py check --deploy` in the virtualenv, and read the error. |
-| `deploy.sh`: "PostgreSQL 14 or later is required" | The server's PostgreSQL is too old | See [Check the PostgreSQL version](#check-the-postgresql-version-first). |
+| `deploy.sh`: "PostgreSQL 13 or later is required" | The server's PostgreSQL is too old | See [Check the PostgreSQL version](#check-the-postgresql-version-first). |
+| `deploy.sh`: "This virtualenv uses Python 3.14, but Django 5.1 needs Python 3.10-3.13" | The app was created with too new a Python | In **Setup Python App**, create the app with Python 3.13 (or 3.12/3.11/3.10), reinstall into that virtualenv, and run `deploy.sh` again. |
+| `AttributeError: 'super' object has no attribute 'dicts'` on any page | Django 5.1 running on Python 3.14 | Same fix as the row above: rebuild the app on Python 3.13 or older. |
 | `deploy.sh`: "Cannot use the database: ... password authentication failed" or "does not exist" | Wrong `DB_*` value | Copy the exact prefixed names from cPanel. Use a letters-and-digits password, or see the quoting note at the top of `.env`. |
 | `deploy.sh`/`backup.sh`: "pg_dump N cannot back up a PostgreSQL M server" | The external database is newer than the server's `pg_dump` | See the external-PostgreSQL option in [Check the PostgreSQL version](#check-the-postgresql-version-first). |
 | `migrate`: "permission denied for schema public" | PostgreSQL 15+ no longer lets every user create tables | In **phpPgAdmin**, signed in as your cPanel user, run `GRANT ALL ON SCHEMA public TO CPANELUSER_mkweb;`, or ask the host. |
 | "Bad Request (400)" | The address used is not in `DJANGO_ALLOWED_HOSTS` | Use `https://kangaroomathbd.org/`. If you changed `DJANGO_ALLOWED_HOSTS`, list host names only, then restart. |
 | "Too many redirects" | Cloudflare's **Flexible** SSL mode sends plain HTTP to the server | In Cloudflare, use SSL mode **Full (strict)**; that alone fixes it. Use `DJANGO_SECURE_PROXY_SSL_HEADER=true` only if you must stay on Flexible, and know that the server then trusts a header any client can send. |
 | "CSRF verification failed" on forms | The origin is not trusted, or HTTPS is not detected | Keep `https://kangaroomathbd.org` in `DJANGO_CSRF_TRUSTED_ORIGINS`. Check the redirect row above. |
+| The home page still shows the old WordPress site | WordPress's `index.php` and rewrite block still own the document root | Run `bash deploy/cpanel/retire-wordpress.sh`, then `deploy.sh`. |
+| Every page is "Bad Request (400)", or a Django debug page saying `DisallowedHost` | The app is running without its `.env`, so `DEBUG` is on and `ALLOWED_HOSTS` is localhost-only | Check that `.env` sits in the Application root from Setup Python App, then restart. `python -c "from django.conf import settings; import django; django.setup(); print(settings.DEBUG, settings.ALLOWED_HOSTS)"` prints what the app actually loaded. |
 | Unstyled pages, or 500 with "Missing staticfiles manifest entry" | Static files were not collected | Run `deploy.sh`. Check that `DJANGO_STATIC_ROOT` is inside the document root. |
 | Uploaded images missing | `DJANGO_MEDIA_ROOT` is wrong, or permissions | It must match the folder under the document root. Folders need 755 and files 644. |
 | `pip` fails building `psycopg` or `Pillow` | Old server OS without matching binary wheels | Pick another Python version in Setup Python App, or ask the host. |

@@ -1,4 +1,9 @@
-Django>=5.2,<5.3
+# Django 5.1, not 5.2: 5.2 requires PostgreSQL 14 or newer and refuses to
+# start on PostgreSQL 13, which is what the cPanel server provides.
+# 5.1 supports PostgreSQL 13+. It needs Python 3.10-3.13; it breaks on
+# Python 3.14, so pick 3.13 or older in cPanel > Setup Python App.
+# When the host moves to PostgreSQL 14+, change this back to >=5.2,<5.3.
+Django>=5.1,<5.2
 Pillow>=11.0,<14.0
 # Reads the .env file in the project root (settings.py).
 python-dotenv>=1.0,<2.0

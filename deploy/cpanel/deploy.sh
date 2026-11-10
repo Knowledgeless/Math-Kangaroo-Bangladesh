@@ -33,6 +33,15 @@ trap 'fail "deploy stopped at line $LINENO; nothing after that step ran."' ERR
 [[ -n "${VIRTUAL_ENV:-}" ]] || fail "Enter the app's virtualenv first (cPanel > Setup Python App shows the 'source .../bin/activate' command)."
 [[ -f manage.py && -f passenger_wsgi.py ]] || fail "Run this from a checkout of the project ($APP_DIR has no manage.py/passenger_wsgi.py)."
 
+# Django 5.1 (pinned in requirements.txt so the site runs on PostgreSQL 13)
+# supports Python 3.10 to 3.13 only; on 3.14 it breaks while rendering
+# templates. Catch that here rather than after the site is live.
+py_minor="$(python -c 'import sys; print(sys.version_info[1])')"
+py_major="$(python -c 'import sys; print(sys.version_info[0])')"
+if (( py_major != 3 || py_minor < 10 || py_minor > 13 )); then
+    fail "This virtualenv uses Python $py_major.$py_minor, but Django 5.1 needs Python 3.10-3.13. In cPanel > Setup Python App, create the app with Python 3.13 (or 3.12/3.11/3.10) and run this again."
+fi
+
 # Production mode, exactly as passenger_wsgi.py runs the live site.
 export DJANGO_SETTINGS_MODULE=MathKangaroo.settings
 export DJANGO_DEBUG=false
@@ -72,7 +81,7 @@ django.setup()
 from django.db import connection
 
 try:
-    # Also enforces Django's minimum server version (PostgreSQL 14+).
+    # Also enforces Django's minimum server version (PostgreSQL 13+).
     connection.ensure_connection()
     server_version = ".".join(str(part) for part in connection.get_database_version())
 except Exception as error:

@@ -6,6 +6,11 @@
 # No directory listings (in particular /static/ and /media/).
 Options -Indexes
 
+# Passenger answers "/" because the document root holds no index file. If a
+# retired WordPress install (or anything else) leaves one behind and the home
+# page is not Django, or "/" answers 403, uncomment the next line.
+#DirectoryIndex disabled
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 

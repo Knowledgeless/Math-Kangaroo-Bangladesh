@@ -1,7 +1,0 @@
-{% extends "base.html" %}
-{% block title %}{% if creating %}New FAQ{% else %}Edit FAQ{% endif %} — Content desk{% endblock %}
-{% block content %}
-<section class="cms-form-shell"><a class="back-link" href="{% url 'cms-dashboard' %}">← Content desk</a><div class="form-page-heading"><span class="eyebrow">Helpful answers</span><h1>{% if creating %}Add an answer.{% else %}Update this answer.{% endif %}</h1><p>Keep answers clear, friendly and easy to scan.</p></div>
-  <form method="post" class="cms-form">{% csrf_token %}{% for field in form %}<div class="form-field field-full"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}</div>{% endfor %}<div class="form-actions"><button class="button button-outline" type="submit" name="action" value="draft">Save draft</button>{% if can_publish %}<button class="button button-dark" type="submit" name="action" value="publish">Publish answer <span aria-hidden="true">↗</span></button>{% endif %}</div></form>
-</section>
-{% endblock %}
